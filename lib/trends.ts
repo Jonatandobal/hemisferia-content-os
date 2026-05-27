@@ -63,7 +63,41 @@ export async function getRecentNews(query: string) {
 
     return articles
   } catch (err) {
-    console.error("SerpAPI error:", err)
+    console.error("SerpAPI news error:", err)
+    return []
+  }
+}
+
+// ============================================
+// SerpAPI — Google Trends related queries (respaldo si la lib oficial bloqueada)
+// ============================================
+export async function getTrendsViaSerpapi(query: string) {
+  const apiKey = process.env.SERPAPI_KEY
+  if (!apiKey) return []
+
+  try {
+    const data = await getJson({
+      engine: "google_trends",
+      q: query,
+      geo: "AR",
+      hl: "es",
+      data_type: "RELATED_QUERIES",
+      api_key: apiKey,
+    })
+
+    const related =
+      ((data.related_queries as { rising?: unknown[]; top?: unknown[] }) ?? {})
+        .rising ?? []
+
+    // Devolvemos top 10 con query + value
+    return (related as Array<Record<string, unknown>>)
+      .slice(0, 10)
+      .map((r) => ({
+        query: r.query,
+        value: r.value ?? r.extracted_value ?? null,
+      }))
+  } catch (err) {
+    console.error("SerpAPI trends error:", err)
     return []
   }
 }

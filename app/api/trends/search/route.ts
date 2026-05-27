@@ -3,7 +3,7 @@ import { z } from "zod"
 import { generateText, Output } from "ai"
 import { openai } from "@ai-sdk/openai"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { getRelatedQueries, getRecentNews } from "@/lib/trends"
+import { getRelatedQueries, getRecentNews, getTrendsViaSerpapi } from "@/lib/trends"
 
 // Vercel functions: subimos timeout porque combinamos varias APIs externas.
 export const maxDuration = 60
@@ -13,7 +13,9 @@ const requestSchema = z.object({
   region: z.string().default("AR"),
 })
 
-// Schema del output que GPT-4o devuelve
+// Schema del output que GPT-4o devuelve.
+// IMPORTANTE: No usar z.string().url() — OpenAI Responses API no soporta 'uri' format.
+// La validación de URL la hacemos en post-procesamiento.
 const trendsSchema = z.object({
   summary: z.string().describe("Síntesis general de qué se está hablando"),
   trends: z
@@ -30,9 +32,10 @@ const trendsSchema = z.object({
           ),
         source_url: z
           .string()
-          .url()
           .nullable()
-          .describe("Link a fuente real si hay una, sino null"),
+          .describe(
+            "Link http/https a fuente real (URL completa). Si no hay fuente clara, devolvé null.",
+          ),
         score: z
           .number()
           .int()
@@ -44,6 +47,17 @@ const trendsSchema = z.object({
     .min(3)
     .max(8),
 })
+
+// Helper para validar URLs después de que GPT las devuelve.
+function safeUrl(input: string | null): string | null {
+  if (!input) return null
+  try {
+    const u = new URL(input)
+    return u.protocol === "http:" || u.protocol === "https:" ? u.toString() : null
+  } catch {
+    return null
+  }
+}
 
 const SYSTEM_PROMPT = `
 Sos un analista de tendencias para Hemisferia, consultora argentina de
@@ -84,21 +98,26 @@ export async function POST(req: NextRequest) {
 
     const { query, region } = parsed.data
 
-    // 1) Traer Google Trends + Google News en paralelo
-    const [related, news] = await Promise.all([
+    // 1) Traer Google Trends + Google News + fallback SerpAPI en paralelo
+    const [related, news, serpapiTrends] = await Promise.all([
       getRelatedQueries(query, region),
       getRecentNews(query),
+      getTrendsViaSerpapi(query),
     ])
 
-    // 2) Armar contexto para GPT-4o
-    const relatedTop = (
-      related?.default?.rankedList?.[0]?.rankedKeyword ?? []
-    )
-      .slice(0, 10)
-      .map((k: { query: string; value?: number }) => ({
-        query: k.query,
-        value: k.value,
-      }))
+    // 2) Armar lista de queries relacionadas — preferir Google Trends directo,
+    //    pero si falla (captcha desde IP de Vercel), usar SerpAPI como respaldo.
+    let relatedTop: { query: unknown; value: unknown }[] = []
+    if (related?.default?.rankedList?.[0]?.rankedKeyword?.length) {
+      relatedTop = related.default.rankedList[0].rankedKeyword
+        .slice(0, 10)
+        .map((k: { query: string; value?: number }) => ({
+          query: k.query,
+          value: k.value,
+        }))
+    } else if (serpapiTrends.length > 0) {
+      relatedTop = serpapiTrends
+    }
 
     const userPrompt = [
       `QUERY BASE: "${query}"`,
@@ -151,7 +170,8 @@ export async function POST(req: NextRequest) {
       title: t.title,
       description: t.description,
       angle: t.angle,
-      source_url: t.source_url,
+      // Validamos URL acá porque OpenAI no soporta 'uri' format en schema.
+      source_url: safeUrl(t.source_url),
       score: t.score,
     }))
 
