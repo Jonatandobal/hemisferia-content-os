@@ -9,11 +9,13 @@ import {
   Calendar,
   BarChart3,
   Settings,
+  Radar,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/trends", label: "Tendencias", icon: Radar },
   { href: "/ideas", label: "Ideas", icon: Lightbulb },
   { href: "/drafts", label: "Drafts", icon: FileText },
   { href: "/calendar", label: "Calendario", icon: Calendar },
