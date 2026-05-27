@@ -1,65 +1,127 @@
-import Image from "next/image";
+import { DashboardShell } from "@/components/layout/dashboard-shell"
+import { Header } from "@/components/layout/header"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { createAdminClient } from "@/lib/supabase/admin"
+import { Lightbulb, FileText, Send, TrendingUp } from "lucide-react"
 
-export default function Home() {
+export const dynamic = "force-dynamic"
+
+async function getDashboardStats() {
+  const supabase = createAdminClient()
+
+  const [ideasRes, draftsRes, postsRes] = await Promise.all([
+    supabase
+      .from("ideas")
+      .select("id, status", { count: "exact" })
+      .eq("status", "pending"),
+    supabase
+      .from("drafts")
+      .select("id, status", { count: "exact" })
+      .in("status", ["draft", "approved"]),
+    supabase
+      .from("posts")
+      .select("id, impressions", { count: "exact" }),
+  ])
+
+  const totalImpressions =
+    postsRes.data?.reduce((sum, p) => sum + (p.impressions ?? 0), 0) ?? 0
+
+  return {
+    pendingIdeas: ideasRes.count ?? 0,
+    activeDrafts: draftsRes.count ?? 0,
+    publishedPosts: postsRes.count ?? 0,
+    totalImpressions,
+  }
+}
+
+export default async function HomePage() {
+  const stats = await getDashboardStats()
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <DashboardShell>
+      <Header
+        title="Dashboard"
+        description="Visión general de tu sistema de contenido"
+      />
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <StatCard
+            label="Ideas pendientes"
+            value={stats.pendingIdeas}
+            icon={Lightbulb}
+            color="text-blue-500"
+          />
+          <StatCard
+            label="Drafts activos"
+            value={stats.activeDrafts}
+            icon={FileText}
+            color="text-orange-500"
+          />
+          <StatCard
+            label="Posts publicados"
+            value={stats.publishedPosts}
+            icon={Send}
+            color="text-emerald-500"
+          />
+          <StatCard
+            label="Impresiones totales"
+            value={stats.totalImpressions.toLocaleString("es-AR")}
+            icon={TrendingUp}
+            color="text-purple-500"
+          />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              Bienvenido a Hemisferia Content OS
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground space-y-2">
+            <p>
+              Tu sistema de gestión de contenido para LinkedIn. Capturá ideas,
+              dejá que la IA genere drafts, aprobá los mejores y publicá.
+            </p>
+            <p>
+              <strong className="text-foreground">Próximo paso:</strong>{" "}
+              capturá tu primera idea en la sección{" "}
+              <a
+                href="/ideas"
+                className="underline underline-offset-4 hover:no-underline"
+              >
+                Ideas
+              </a>
+              .
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    </DashboardShell>
+  )
+}
+
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+  color,
+}: {
+  label: string
+  value: number | string
+  icon: React.ComponentType<{ className?: string }>
+  color: string
+}) {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">{label}</p>
+            <p className="text-2xl font-semibold tabular-nums">{value}</p>
+          </div>
+          <Icon className={`w-5 h-5 ${color}`} />
         </div>
-      </main>
-    </div>
-  );
+      </CardContent>
+    </Card>
+  )
 }
