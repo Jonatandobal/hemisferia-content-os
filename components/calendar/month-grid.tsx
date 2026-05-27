@@ -2,15 +2,22 @@
 
 import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card"
 import {
   ChevronLeft,
   ChevronRight,
   Calendar as CalendarIcon,
   Loader2,
   X,
+  Clock,
 } from "lucide-react"
 import {
   startOfMonth,
@@ -236,24 +243,74 @@ function DraftChip({
 }) {
   const labels = ["Caso", "Contra", "Educ"]
   const variantLabel = labels[draft.variant - 1] ?? `V${draft.variant}`
+  const hour = draft.scheduled_for
+    ? format(new Date(draft.scheduled_for), "HH:mm")
+    : null
+
   return (
-    <div className="group bg-foreground text-background rounded px-1.5 py-1 flex items-center justify-between gap-1">
-      <span className="truncate text-[10px] font-medium">
-        {variantLabel}
-      </span>
-      <button
-        onClick={onUnschedule}
-        disabled={busy}
-        className="opacity-0 group-hover:opacity-100 transition-opacity"
-        title="Quitar programación"
+    <HoverCard openDelay={120} closeDelay={80}>
+      <HoverCardTrigger asChild>
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="group bg-foreground text-background rounded px-1.5 py-1 flex items-center justify-between gap-1 cursor-pointer"
+        >
+          <span className="truncate text-[10px] font-medium">
+            {hour ? `${hour} · ` : ""}
+            {variantLabel}
+          </span>
+          <button
+            onClick={onUnschedule}
+            disabled={busy}
+            className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+            title="Quitar programación"
+          >
+            {busy ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <X className="w-3 h-3" />
+            )}
+          </button>
+        </div>
+      </HoverCardTrigger>
+      <HoverCardContent
+        side="right"
+        align="start"
+        className="w-96 p-0 overflow-hidden"
       >
-        {busy ? (
-          <Loader2 className="w-3 h-3 animate-spin" />
-        ) : (
-          <X className="w-3 h-3" />
-        )}
-      </button>
-    </div>
+        <div className="p-3 border-b bg-muted/30 space-y-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold">
+              Variante {draft.variant} · {variantLabel}
+            </span>
+            {hour ? (
+              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                <Clock className="w-3 h-3" />
+                {hour} hs
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        {draft.image_url ? (
+          <div className="relative aspect-[16/9] bg-muted">
+            <Image
+              src={draft.image_url}
+              alt="Preview"
+              fill
+              sizes="384px"
+              className="object-cover"
+              unoptimized
+            />
+          </div>
+        ) : null}
+
+        <div className="p-3 max-h-64 overflow-y-auto">
+          <p className="text-xs leading-relaxed whitespace-pre-wrap">
+            {draft.content}
+          </p>
+        </div>
+      </HoverCardContent>
+    </HoverCard>
   )
 }
 
