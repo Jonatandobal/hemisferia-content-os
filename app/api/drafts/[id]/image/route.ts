@@ -66,7 +66,7 @@ export async function POST(
         n: 1,
         size: "1792x1024",
         quality: "standard", // "hd" cuesta el doble
-        style: "natural", // "vivid" es más saturado
+        // 'style' fue deprecado en la API actual — el control de estilo va en el prompt.
       })
     } catch (openaiErr) {
       // Capturar y propagar el mensaje real de OpenAI (billing, rate limit, etc.)
