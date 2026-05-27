@@ -2,25 +2,18 @@
 // Combina Google Trends (gratis) + SerpAPI (100 reqs/mes gratis) + GPT-4o.
 
 import { getJson } from "serpapi"
+import googleTrends from "google-trends-api"
 
 // ============================================
 // Google Trends (sin key, via librería)
 // ============================================
-// La librería no tiene tipos, lo importamos como any.
-type GoogleTrendsClient = {
-  relatedQueries: (opts: {
-    keyword: string
-    geo?: string
-    hl?: string
-  }) => Promise<string>
-  dailyTrends: (opts: { geo?: string; hl?: string }) => Promise<string>
-}
-
 export async function getRelatedQueries(keyword: string, geo = "AR") {
-  // Import dinámico — la librería es CommonJS sin tipos.
-  const trends = (await import("google-trends-api")) as unknown as GoogleTrendsClient
   try {
-    const raw = await trends.relatedQueries({ keyword, geo, hl: "es-AR" })
+    const raw = await googleTrends.relatedQueries({
+      keyword,
+      geo,
+      hl: "es-AR",
+    })
     return JSON.parse(raw)
   } catch (err) {
     console.error("Google Trends related error:", err)
@@ -29,9 +22,8 @@ export async function getRelatedQueries(keyword: string, geo = "AR") {
 }
 
 export async function getDailyTrends(geo = "AR") {
-  const trends = (await import("google-trends-api")) as unknown as GoogleTrendsClient
   try {
-    const raw = await trends.dailyTrends({ geo, hl: "es-AR" })
+    const raw = await googleTrends.dailyTrends({ geo, hl: "es-AR" })
     return JSON.parse(raw)
   } catch (err) {
     console.error("Google Trends daily error:", err)
