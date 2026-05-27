@@ -58,33 +58,73 @@ export async function POST(
 
     // 3) DALL-E 3 genera la imagen (1792x1024 = aspect ratio cercano a 16:9 que
     //    es lo que LinkedIn renderiza bien en feed).
-    let imageRes
-    try {
-      imageRes = await openaiNative.images.generate({
-        model: "dall-e-3",
-        prompt: cleanPrompt,
-        n: 1,
-        size: "1792x1024",
-        quality: "standard", // "hd" cuesta el doble
-        // 'style' fue deprecado en la API actual — el control de estilo va en el prompt.
-      })
-    } catch (openaiErr) {
-      // Capturar y propagar el mensaje real de OpenAI (billing, rate limit, etc.)
-      console.error("DALL-E error:", openaiErr)
+    // Intentamos en orden: gpt-image-1 (nuevo) → dall-e-3 (legacy) → dall-e-2.
+    // Distintas cuentas OpenAI tienen acceso a modelos distintos.
+    const models = ["gpt-image-1", "dall-e-3", "dall-e-2"] as const
+    type Size = "1024x1024" | "1024x1536" | "1536x1024" | "1792x1024"
+    const sizeByModel: Record<(typeof models)[number], Size> = {
+      "gpt-image-1": "1536x1024", // 3:2, cercano a 16:9 (LinkedIn rinde bien)
+      "dall-e-3": "1792x1024",
+      "dall-e-2": "1024x1024",
+    }
+
+    let imageRes: Awaited<
+      ReturnType<typeof openaiNative.images.generate>
+    > | null = null
+    let lastErr: unknown = null
+    let modelUsed: string | null = null
+
+    for (const m of models) {
+      try {
+        imageRes = await openaiNative.images.generate({
+          model: m,
+          prompt: cleanPrompt,
+          n: 1,
+          size: sizeByModel[m],
+        })
+        modelUsed = m
+        break
+      } catch (openaiErr) {
+        console.warn(`Image gen failed with ${m}:`, openaiErr)
+        lastErr = openaiErr
+        // Si es error de modelo "does not exist" o "not available", probamos el siguiente.
+        // Para otros errores (billing, rate limit) cortamos acá.
+        const msg = openaiErr instanceof Error ? openaiErr.message : ""
+        const isModelAccessIssue =
+          msg.includes("does not exist") ||
+          msg.includes("not available") ||
+          msg.includes("not have access") ||
+          msg.includes("Unknown model")
+        if (!isModelAccessIssue) break
+      }
+    }
+
+    if (!imageRes) {
       const message =
-        openaiErr instanceof Error
-          ? `OpenAI: ${openaiErr.message}`
-          : "OpenAI rechazó la generación"
+        lastErr instanceof Error
+          ? `OpenAI: ${lastErr.message}`
+          : "Ningún modelo de imagen disponible en tu cuenta"
       return NextResponse.json(
         { error: message, prompt: cleanPrompt },
         { status: 502 },
       )
     }
 
-    const imageUrl = imageRes.data?.[0]?.url
+    // gpt-image-1 devuelve b64_json por default, dall-e-3 devuelve url
+    const first = imageRes.data?.[0]
+    let imageUrl: string | null = first?.url ?? null
+    if (!imageUrl && first?.b64_json) {
+      // Convertir base64 a data URL para guardar
+      imageUrl = `data:image/png;base64,${first.b64_json}`
+    }
+
     if (!imageUrl) {
       return NextResponse.json(
-        { error: "DALL-E no devolvió URL", prompt: cleanPrompt },
+        {
+          error: "El modelo no devolvió imagen",
+          prompt: cleanPrompt,
+          modelUsed,
+        },
         { status: 500 },
       )
     }
