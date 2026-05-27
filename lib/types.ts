@@ -23,6 +23,9 @@ export interface Draft {
   status: DraftStatus
   scheduled_for: string | null
   created_at: string
+  image_url?: string | null
+  image_prompt?: string | null
+  image_generated_at?: string | null
 }
 
 export interface Post {

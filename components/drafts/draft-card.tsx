@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -13,6 +14,8 @@ import {
   ThumbsDown,
   Loader2,
   Sparkles,
+  ImageIcon,
+  RefreshCw,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
@@ -24,7 +27,9 @@ interface DraftCardProps {
 
 export function DraftCard({ draft }: DraftCardProps) {
   const router = useRouter()
-  const [busy, setBusy] = useState<null | "approve" | "reject" | "copy">(null)
+  const [busy, setBusy] = useState<
+    null | "approve" | "reject" | "copy" | "image"
+  >(null)
   const [copied, setCopied] = useState(false)
 
   async function updateStatus(status: "approved" | "rejected") {
@@ -54,6 +59,25 @@ export function DraftCard({ draft }: DraftCardProps) {
       setTimeout(() => setCopied(false), 2000)
     } catch {
       toast.error("No se pudo copiar")
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function handleGenerateImage() {
+    setBusy("image")
+    try {
+      const res = await fetch(`/api/drafts/${draft.id}/image`, {
+        method: "POST",
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error ?? "No se pudo generar")
+      }
+      toast.success("Imagen generada ✨")
+      router.refresh()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error")
     } finally {
       setBusy(null)
     }
@@ -94,7 +118,28 @@ export function DraftCard({ draft }: DraftCardProps) {
           {draft.content}
         </div>
 
-        <div className="flex items-center justify-between gap-2">
+        {/* Imagen generada por DALL-E si existe */}
+        {draft.image_url ? (
+          <div className="space-y-2">
+            <div className="relative aspect-[16/9] rounded-md overflow-hidden border bg-muted">
+              <Image
+                src={draft.image_url}
+                alt="Imagen generada para el post"
+                fill
+                sizes="(max-width: 768px) 100vw, 600px"
+                className="object-cover"
+                unoptimized // URLs de DALL-E expiran en 60min y no son CDN-optimizables
+              />
+            </div>
+            {draft.image_prompt ? (
+              <p className="text-[10px] text-muted-foreground italic line-clamp-2">
+                Prompt: {draft.image_prompt}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <span className="text-xs text-muted-foreground">
             {formatDistanceToNow(new Date(draft.created_at), {
               addSuffix: true,
@@ -102,7 +147,36 @@ export function DraftCard({ draft }: DraftCardProps) {
             })}
           </span>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleGenerateImage}
+              disabled={busy !== null}
+              title={
+                draft.image_url
+                  ? "Regenerar imagen"
+                  : "Generar imagen con IA"
+              }
+            >
+              {busy === "image" ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                  Generando...
+                </>
+              ) : draft.image_url ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                  Nueva imagen
+                </>
+              ) : (
+                <>
+                  <ImageIcon className="w-3.5 h-3.5 mr-1.5" />
+                  Imagen
+                </>
+              )}
+            </Button>
+
             <Button
               size="sm"
               variant="outline"
