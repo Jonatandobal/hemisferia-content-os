@@ -20,6 +20,8 @@ import {
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
 import type { Draft } from "@/lib/types"
+import { UploadImageButton } from "./upload-image-button"
+import { LinkedInPreview } from "./linkedin-preview"
 
 interface DraftCardProps {
   draft: Draft
@@ -172,10 +174,17 @@ export function DraftCard({ draft }: DraftCardProps) {
               ) : (
                 <>
                   <ImageIcon className="w-3.5 h-3.5 mr-1.5" />
-                  Imagen
+                  Imagen IA
                 </>
               )}
             </Button>
+
+            <UploadImageButton
+              draftId={draft.id}
+              disabled={busy !== null}
+            />
+
+            <LinkedInPreview draft={draft} />
 
             <Button
               size="sm"

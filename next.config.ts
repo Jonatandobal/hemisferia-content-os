@@ -9,12 +9,17 @@ const nextConfig: NextConfig = {
   },
 
   // Dominios externos permitidos para <Image />.
-  // - oaidalleapiprodscus.blob.core.windows.net: URLs temporales de DALL-E 3.
   images: {
     remotePatterns: [
+      // URLs temporales de DALL-E 3 (vencen en 60min)
       {
         protocol: "https",
         hostname: "oaidalleapiprodscus.blob.core.windows.net",
+      },
+      // Supabase Storage — imágenes subidas por el usuario o cacheadas
+      {
+        protocol: "https",
+        hostname: "yrmxmfnglrithgqqvpif.supabase.co",
       },
     ],
   },
