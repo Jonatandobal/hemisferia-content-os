@@ -39,13 +39,12 @@ export default function DailyReminderEmail({
 }: DailyReminderEmailProps) {
   const dateLabel = format(date, "EEEE d 'de' MMMM", { locale: es })
   const variantLabels = ["Caso real", "Contrarian", "Educativo", "Founder"]
+  const previewText = `Tenés ${drafts.length} ${drafts.length === 1 ? "post" : "posts"} para publicar hoy`
 
   return (
     <Html>
       <Head />
-      <Preview>
-        Tenés {drafts.length} {drafts.length === 1 ? "post" : "posts"} para publicar hoy
-      </Preview>
+      <Preview>{previewText}</Preview>
       <Tailwind>
         <Body className="bg-gray-50 font-sans">
           <Container className="mx-auto py-8 px-4 max-w-xl">
