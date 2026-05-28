@@ -3,7 +3,9 @@ import { createAdminClient } from "@/lib/supabase/admin"
 
 export const maxDuration = 30
 
-const MAX_SIZE = 5 * 1024 * 1024 // 5MB
+// 4MB — cubre lo que el cliente comprime a ~3.5MB con margen.
+// Vercel Functions Hobby tiene tope hard de 4.5MB de request body.
+const MAX_SIZE = 4 * 1024 * 1024
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/webp"]
 const BUCKET = "draft-images"
 
@@ -28,7 +30,10 @@ export async function POST(
 
     if (file.size > MAX_SIZE) {
       return NextResponse.json(
-        { error: "Archivo muy grande (máx 5MB)" },
+        {
+          error:
+            "Archivo demasiado grande después de comprimir. Probá con una imagen distinta.",
+        },
         { status: 400 },
       )
     }
