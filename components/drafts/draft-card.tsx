@@ -22,6 +22,7 @@ import { es } from "date-fns/locale"
 import type { Draft } from "@/lib/types"
 import { UploadImageButton } from "./upload-image-button"
 import { LinkedInPreview } from "./linkedin-preview"
+import { PostNowButton } from "./post-now-button"
 
 interface DraftCardProps {
   draft: Draft
@@ -233,6 +234,8 @@ export function DraftCard({ draft }: DraftCardProps) {
                 </Button>
               </>
             )}
+
+            {isApproved && <PostNowButton draft={draft} />}
           </div>
         </div>
       </CardContent>
