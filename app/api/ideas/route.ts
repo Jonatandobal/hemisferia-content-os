@@ -7,6 +7,7 @@ const createSchema = z.object({
   raw_text: z.string().min(3, "Mínimo 3 caracteres").max(2000),
   pillar: z.enum(["caso", "contrarian", "educativo", "founder"]).nullable(),
   source: z.enum(["web", "manual", "shortcut"]).default("web"),
+  story_id: z.string().uuid().nullable().optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -28,6 +29,7 @@ export async function POST(req: NextRequest) {
         raw_text: parsed.data.raw_text.trim(),
         pillar: parsed.data.pillar,
         source: parsed.data.source,
+        story_id: parsed.data.story_id ?? null,
       })
       .select()
       .single()
@@ -38,6 +40,21 @@ export async function POST(req: NextRequest) {
         { error: "No se pudo guardar la idea" },
         { status: 500 },
       )
+    }
+
+    // Contar el uso de la historia (no bloquea la respuesta si falla)
+    if (parsed.data.story_id) {
+      const { data: story } = await supabase
+        .from("stories")
+        .select("times_used")
+        .eq("id", parsed.data.story_id)
+        .single()
+      if (story) {
+        await supabase
+          .from("stories")
+          .update({ times_used: story.times_used + 1 })
+          .eq("id", parsed.data.story_id)
+      }
     }
 
     return NextResponse.json({ idea: data }, { status: 201 })

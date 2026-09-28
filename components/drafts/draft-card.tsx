@@ -26,6 +26,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { DraftStatusBadge, PillarBadge } from "@/components/common/badges"
 import { type Draft, draftTemplate } from "@/lib/types"
 import { findPlaceholders } from "@/lib/post-format"
+import { lintPost } from "@/lib/post-lint"
+import { HOOK_FORMULAS, type HookFormula } from "@/lib/hook-formulas"
 import { LINKEDIN_FOLD, PostText } from "./post-text"
 import { UploadImageButton } from "./upload-image-button"
 import { LinkedInPreview } from "./linkedin-preview"
@@ -119,6 +121,10 @@ export function DraftCard({ draft, ideaText, focused }: DraftCardProps) {
 
   const template = draftTemplate(draft)
   const placeholders = findPlaceholders(draft.content)
+  const lintIssues = lintPost(editing ? text : draft.content)
+  const hookFormula = draft.hook_formula
+    ? HOOK_FORMULAS[draft.hook_formula as HookFormula]
+    : null
   const isPending = draft.status === "draft"
   const isApproved = draft.status === "approved"
   const isRejected = draft.status === "rejected"
@@ -142,8 +148,9 @@ export function DraftCard({ draft, ideaText, focused }: DraftCardProps) {
       <div className="flex items-center gap-2 flex-wrap px-4 pt-4 md:px-5">
         <PillarBadge pillar={template} />
         <DraftStatusBadge status={draft.status} scheduled={isScheduled} />
-        <span className="text-xs text-muted-foreground ml-auto">
-          Variante {draft.variant} ·{" "}
+        <span className="text-xs text-muted-foreground ml-auto text-right">
+          Variante {draft.variant}
+          {hookFormula ? ` · ${hookFormula.label}` : ""} ·{" "}
           {formatDistanceToNow(new Date(draft.created_at), {
             addSuffix: true,
             locale: es,
@@ -207,8 +214,31 @@ export function DraftCard({ draft, ideaText, focused }: DraftCardProps) {
       </div>
 
       {/* Avisos */}
-      {!editing && (placeholders.length > 0 || autoPublish || draft.publora_error) ? (
+      {!editing &&
+      (placeholders.length > 0 || lintIssues.length > 0 || autoPublish || draft.publora_error) ? (
         <div className="px-4 md:px-5 pb-4 space-y-2">
+          {lintIssues.length > 0 && !isRejected && !isPublished ? (
+            <div className="space-y-1.5 rounded-xl border border-border bg-secondary/50 px-3 py-2">
+              <p className="text-xs font-medium text-muted-foreground">
+                Revisión automática — {lintIssues.length}{" "}
+                {lintIssues.length === 1 ? "punto" : "puntos"} contra las reglas del prompt
+              </p>
+              <ul className="space-y-1">
+                {lintIssues.map((issue) => (
+                  <li
+                    key={issue.id}
+                    className={cn(
+                      "text-xs leading-relaxed",
+                      issue.severity === "error" ? "text-destructive" : "text-muted-foreground",
+                    )}
+                  >
+                    {issue.severity === "error" ? "● " : "○ "}
+                    {issue.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           {placeholders.length > 0 && !isRejected ? (
             <div className="flex items-center justify-between gap-3 rounded-xl bg-warning-soft px-3 py-2 text-sm text-warning">
               <span>

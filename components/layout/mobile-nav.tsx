@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   BarChart3,
+  BookMarked,
   CalendarDays,
   FileText,
   LayoutDashboard,
@@ -22,6 +23,7 @@ export function MobileTopBar() {
   const pathname = usePathname()
   const secondary = [
     { href: "/trends", label: "Tendencias", icon: Radar },
+    { href: "/stories", label: "Historias", icon: BookMarked },
     { href: "/analytics", label: "Analytics", icon: BarChart3 },
     { href: "/settings", label: "Configuración", icon: Settings },
   ]

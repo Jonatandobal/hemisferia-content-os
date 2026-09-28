@@ -13,6 +13,18 @@ export interface Idea {
   pillar: Pillar | null
   status: IdeaStatus
   created_at: string
+  story_id?: string | null
+}
+
+export interface Story {
+  id: string
+  title: string
+  situation: string
+  result: string | null
+  client_type: string | null
+  pillar: Pillar | null
+  times_used: number
+  created_at: string
 }
 
 export interface Draft {
@@ -24,6 +36,7 @@ export interface Draft {
   scheduled_for: string | null
   created_at: string
   template?: Pillar | null
+  hook_formula?: string | null
   image_url?: string | null
   image_prompt?: string | null
   image_generated_at?: string | null

@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { PillarPicker } from "./pillar-picker"
-import type { Pillar } from "@/lib/types"
+import { StoryPicker } from "./story-picker"
+import type { Pillar, Story } from "@/lib/types"
 
 const MAX_LENGTH = 2000
 
@@ -31,16 +32,32 @@ function buildRawText(f: {
     .join("\n")
 }
 
-export function NewIdeaForm() {
+export function NewIdeaForm({ stories = [] }: { stories?: Story[] }) {
   const router = useRouter()
   const [fields, setFields] = useState({ idea: "", happened: "", result: "", client: "" })
   const [pillar, setPillar] = useState<Pillar | null>(null)
+  const [storyId, setStoryId] = useState<string | null>(null)
+  const [saveAsStory, setSaveAsStory] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   const rawText = buildRawText(fields)
   const tooLong = rawText.length > MAX_LENGTH
   const set = (k: keyof typeof fields) => (v: string) =>
     setFields((s) => ({ ...s, [k]: v }))
+
+  function handlePickStory(story: Story | null) {
+    setStoryId(story?.id ?? null)
+    if (story) {
+      setFields((s) => ({
+        ...s,
+        happened: story.situation,
+        result: story.result ?? "",
+        client: story.client_type ?? "",
+      }))
+      if (story.pillar) setPillar(story.pillar)
+      setSaveAsStory(false)
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -50,16 +67,46 @@ export function NewIdeaForm() {
     }
     setSubmitting(true)
     try {
+      // Si marcaste guardar como historia, primero se crea la historia y
+      // después la idea queda linkeada — así no la volvés a escribir.
+      let finalStoryId = storyId
+      if (!finalStoryId && saveAsStory && fields.happened.trim()) {
+        const storyRes = await fetch("/api/stories", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: fields.idea.trim().slice(0, 80),
+            situation: fields.happened.trim(),
+            result: fields.result.trim() || undefined,
+            client_type: fields.client.trim() || undefined,
+            pillar,
+          }),
+        })
+        if (storyRes.ok) {
+          const data = await storyRes.json()
+          finalStoryId = data.story.id
+        }
+      }
+
       const res = await fetch("/api/ideas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ raw_text: rawText, pillar, source: "web" }),
+        body: JSON.stringify({
+          raw_text: rawText,
+          pillar,
+          source: "web",
+          story_id: finalStoryId,
+        }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? "No se pudo guardar")
       }
-      toast.success("Idea guardada")
+      toast.success(
+        finalStoryId && finalStoryId !== storyId
+          ? "Idea guardada y caso agregado a tu banco de historias"
+          : "Idea guardada",
+      )
       router.push("/ideas")
       router.refresh()
     } catch (err) {
@@ -96,6 +143,12 @@ export function NewIdeaForm() {
         </div>
       </div>
 
+      {stories.length > 0 ? (
+        <div className="rounded-2xl border border-border bg-card p-5 md:p-6">
+          <StoryPicker stories={stories} selectedId={storyId} onSelect={handlePickStory} />
+        </div>
+      ) : null}
+
       <div className="rounded-2xl border border-border bg-card p-5 md:p-6 space-y-5">
         <div>
           <h2 className="text-base font-semibold">Hechos reales</h2>
@@ -112,6 +165,19 @@ export function NewIdeaForm() {
         <Field id="happened" label="¿Qué pasó?" placeholder="La escena: qué te dijo el cliente, qué viste, qué salió mal" value={fields.happened} onChange={set("happened")} disabled={submitting} multiline />
         <Field id="result" label="Dato o resultado real" placeholder="Ej: pasaron de 3 horas diarias a 20 minutos" value={fields.result} onChange={set("result")} disabled={submitting} />
         <Field id="client" label="Cliente o rubro" placeholder="Ej: carnicería de barrio, 8 empleados" value={fields.client} onChange={set("client")} disabled={submitting} />
+
+        {!storyId && fields.happened.trim() ? (
+          <label className="flex items-start gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={saveAsStory}
+              onChange={(e) => setSaveAsStory(e.target.checked)}
+              disabled={submitting}
+              className="mt-0.5"
+            />
+            Guardar este caso en mi banco de historias para reusarlo en otras ideas
+          </label>
+        ) : null}
       </div>
 
       <div className="flex items-center justify-between gap-3">

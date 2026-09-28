@@ -6,6 +6,7 @@ import {
   BarChart3,
   Settings,
   Radar,
+  BookMarked,
   type LucideIcon,
 } from "lucide-react"
 
@@ -23,6 +24,7 @@ export const NAV_GROUPS: { label: string | null; items: NavItem[] }[] = [
     items: [
       { href: "/trends", label: "Tendencias", icon: Radar },
       { href: "/ideas", label: "Ideas", icon: Lightbulb },
+      { href: "/stories", label: "Historias", icon: BookMarked },
     ],
   },
   {

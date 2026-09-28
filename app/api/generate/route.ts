@@ -5,6 +5,7 @@ import { openai } from "@ai-sdk/openai"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { CURRENT_SYSTEM_PROMPT } from "@/lib/prompts"
 import { hookAndClosing, toLinkedInText } from "@/lib/post-format"
+import { HOOK_FORMULA_IDS } from "@/lib/hook-formulas"
 
 // Schema que el modelo respeta para devolver structured output.
 const variantsSchema = z.object({
@@ -12,6 +13,9 @@ const variantsSchema = z.object({
     .array(
       z.object({
         template: z.enum(["caso", "contrarian", "educativo", "founder"]),
+        hook_formula: z
+          .enum(HOOK_FORMULA_IDS as [string, ...string[]])
+          .describe("Qué fórmula de gancho usó esta variante. Distinta en cada una de las 3."),
         hook: z
           .string()
           .describe("Línea 1: afirmación o dato, nunca pregunta. Máx 12 palabras"),
@@ -78,12 +82,33 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Si la idea viene de una historia guardada, esos datos son reales y
+    // se pasan aparte para que el modelo no los trate como "a completar".
+    let storyBlock: string[] = []
+    if (idea.story_id) {
+      const { data: story } = await supabase
+        .from("stories")
+        .select("*")
+        .eq("id", idea.story_id)
+        .single()
+      if (story) {
+        storyBlock = [
+          ``,
+          `HISTORIA VERIFICADA (hechos reales confirmados, usalos sin [COMPLETAR]):`,
+          `- Qué pasó: ${story.situation}`,
+          story.result ? `- Resultado real: ${story.result}` : null,
+          story.client_type ? `- Cliente / rubro: ${story.client_type}` : null,
+        ].filter((l): l is string => l !== null)
+      }
+    }
+
     const recent = (recentRes.data ?? []).map((d) => hookAndClosing(d.content))
 
     // 2) Construir prompt con la idea + pilar (si lo tiene)
     const userPrompt = [
       `IDEA CRUDA (estos son TODOS los hechos disponibles, no agregues otros):`,
       idea.raw_text,
+      ...storyBlock,
       ``,
       idea.pillar
         ? `PILAR PRIORIZADO: ${idea.pillar} (al menos UNA de las 3 variantes debe usar este pilar)`
@@ -113,6 +138,7 @@ export async function POST(req: NextRequest) {
       idea_id: idea.id,
       variant: index + 1,
       template: variant.template,
+      hook_formula: variant.hook_formula,
       content: toLinkedInText(variant.full_post),
       status: "draft" as const,
     }))
