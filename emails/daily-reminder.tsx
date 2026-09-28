@@ -16,10 +16,12 @@ import {
   Text,
 } from "@react-email/components"
 import { formatLongDate, formatTime } from "@/lib/timezone"
+import { type Pillar, PILLAR_LABELS, draftTemplate } from "@/lib/types"
 
 interface DraftPreview {
   id: string
   variant: number
+  template: Pillar | null
   content: string
   scheduled_for: string | null
   image_url: string | null
@@ -37,7 +39,6 @@ export default function DailyReminderEmail({
   drafts,
 }: DailyReminderEmailProps) {
   const dateLabel = formatLongDate(date)
-  const variantLabels = ["Caso real", "Contrarian", "Educativo", "Founder"]
   const previewText = `Tenés ${drafts.length} ${drafts.length === 1 ? "post" : "posts"} para publicar hoy`
 
   return (
@@ -68,8 +69,10 @@ export default function DailyReminderEmail({
                 const hour = draft.scheduled_for
                   ? formatTime(new Date(draft.scheduled_for))
                   : "—"
-                const variantLabel =
-                  variantLabels[draft.variant - 1] ?? `V${draft.variant}`
+                const template = draftTemplate(draft)
+                const variantLabel = template
+                  ? PILLAR_LABELS[template]
+                  : `V${draft.variant}`
 
                 return (
                   <Section key={draft.id} className="mb-6">

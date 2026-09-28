@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     // Drafts approved + scheduled_for en el día de hoy
     const { data: drafts, error } = await supabase
       .from("drafts")
-      .select("id, variant, content, scheduled_for, image_url")
+      .select("id, variant, template, content, scheduled_for, image_url")
       .eq("status", "approved")
       .gte("scheduled_for", start.toISOString())
       .lt("scheduled_for", end.toISOString())
@@ -70,6 +70,7 @@ export async function GET(req: NextRequest) {
         drafts: drafts.map((d) => ({
           id: d.id,
           variant: d.variant,
+          template: d.template,
           content: d.content,
           scheduled_for: d.scheduled_for,
           image_url: d.image_url,
