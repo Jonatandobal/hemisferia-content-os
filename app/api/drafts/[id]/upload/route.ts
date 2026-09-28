@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { syncDraftToPublora } from "@/lib/publora-sync"
 
 export const maxDuration = 30
 
@@ -107,9 +108,13 @@ export async function POST(
       )
     }
 
+    // Si el draft ya estaba programado, reprogramarlo con la imagen nueva
+    const publora = await syncDraftToPublora(supabase, id)
+
     return NextResponse.json({
       image_url: publicUrl,
       path,
+      publora,
     })
   } catch (err) {
     console.error("Upload error:", err)

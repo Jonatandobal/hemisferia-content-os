@@ -2,113 +2,224 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
-import type { Pillar } from "@/lib/types"
+import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { PillarPicker } from "./pillar-picker"
+import { StoryPicker } from "./story-picker"
+import type { Pillar, Story } from "@/lib/types"
 
-export function NewIdeaForm() {
+const MAX_LENGTH = 2000
+
+// Los campos opcionales son hechos reales para la IA: el prompt tiene
+// prohibido inventar, así que lo que no esté acá sale como [COMPLETAR].
+function buildRawText(f: {
+  idea: string
+  happened: string
+  result: string
+  client: string
+}) {
+  return [
+    f.idea.trim(),
+    f.happened.trim() && `Qué pasó: ${f.happened.trim()}`,
+    f.result.trim() && `Dato o resultado real: ${f.result.trim()}`,
+    f.client.trim() && `Cliente / rubro: ${f.client.trim()}`,
+  ]
+    .filter(Boolean)
+    .join("\n")
+}
+
+export function NewIdeaForm({ stories = [] }: { stories?: Story[] }) {
   const router = useRouter()
-  const [rawText, setRawText] = useState("")
-  const [pillar, setPillar] = useState<Pillar | "none">("none")
+  const [fields, setFields] = useState({ idea: "", happened: "", result: "", client: "" })
+  const [pillar, setPillar] = useState<Pillar | null>(null)
+  const [storyId, setStoryId] = useState<string | null>(null)
+  const [saveAsStory, setSaveAsStory] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+
+  const rawText = buildRawText(fields)
+  const tooLong = rawText.length > MAX_LENGTH
+  const set = (k: keyof typeof fields) => (v: string) =>
+    setFields((s) => ({ ...s, [k]: v }))
+
+  function handlePickStory(story: Story | null) {
+    setStoryId(story?.id ?? null)
+    if (story) {
+      setFields((s) => ({
+        ...s,
+        happened: story.situation,
+        result: story.result ?? "",
+        client: story.client_type ?? "",
+      }))
+      if (story.pillar) setPillar(story.pillar)
+      setSaveAsStory(false)
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (rawText.trim().length < 3) {
-      toast.error("La idea es muy corta (mínimo 3 caracteres)")
+    if (fields.idea.trim().length < 3) {
+      toast.error("Escribí la idea (al menos unas palabras)")
       return
     }
-
     setSubmitting(true)
     try {
+      // Si marcaste guardar como historia, primero se crea la historia y
+      // después la idea queda linkeada — así no la volvés a escribir.
+      let finalStoryId = storyId
+      if (!finalStoryId && saveAsStory && fields.happened.trim()) {
+        const storyRes = await fetch("/api/stories", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: fields.idea.trim().slice(0, 80),
+            situation: fields.happened.trim(),
+            result: fields.result.trim() || undefined,
+            client_type: fields.client.trim() || undefined,
+            pillar,
+          }),
+        })
+        if (storyRes.ok) {
+          const data = await storyRes.json()
+          finalStoryId = data.story.id
+        }
+      }
+
       const res = await fetch("/api/ideas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           raw_text: rawText,
-          pillar: pillar === "none" ? null : pillar,
+          pillar,
           source: "web",
+          story_id: finalStoryId,
         }),
       })
-
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? "No se pudo guardar")
       }
-
-      toast.success("Idea guardada")
-      setRawText("")
-      setPillar("none")
+      toast.success(
+        finalStoryId && finalStoryId !== storyId
+          ? "Idea guardada y caso agregado a tu banco de historias"
+          : "Idea guardada",
+      )
       router.push("/ideas")
       router.refresh()
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Error inesperado"
-      toast.error(message)
+      toast.error(err instanceof Error ? err.message : "Error inesperado")
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 max-w-2xl">
-      <div className="space-y-2">
-        <Label htmlFor="raw_text">Idea cruda</Label>
-        <Textarea
-          id="raw_text"
-          value={rawText}
-          onChange={(e) => setRawText(e.target.value)}
-          placeholder="Ej: cliente carnicería que automaticé control de stock con sheets + whatsapp"
-          rows={5}
-          disabled={submitting}
-          autoFocus
-        />
-        <p className="text-xs text-muted-foreground">
-          Escribilo como te venga. Después la IA lo convierte en posts.
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="rounded-2xl border border-border bg-card p-5 md:p-6 space-y-5">
+        <div className="space-y-2">
+          <Label htmlFor="idea" className="text-base font-medium">
+            La idea
+          </Label>
+          <Textarea
+            id="idea"
+            value={fields.idea}
+            onChange={(e) => set("idea")(e.target.value)}
+            placeholder="Ej: automatizamos el control de stock de una carnicería con Sheets + WhatsApp"
+            rows={3}
+            disabled={submitting}
+            autoFocus
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-base font-medium">Pilar</Label>
+          <PillarPicker value={pillar} onChange={setPillar} disabled={submitting} />
+          <p className="text-xs text-muted-foreground">
+            Opcional. Si elegís uno, al menos una de las 3 variantes lo usa.
+          </p>
+        </div>
+      </div>
+
+      {stories.length > 0 ? (
+        <div className="rounded-2xl border border-border bg-card p-5 md:p-6">
+          <StoryPicker stories={stories} selectedId={storyId} onSelect={handlePickStory} />
+        </div>
+      ) : null}
+
+      <div className="rounded-2xl border border-border bg-card p-5 md:p-6 space-y-5">
+        <div>
+          <h2 className="text-base font-semibold">Hechos reales</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Opcional, pero es lo que más mejora los posts: la IA no inventa
+            datos, así que lo que no pongas acá queda como{" "}
+            <code className="text-xs bg-warning-soft text-warning px-1 py-0.5 rounded">
+              [COMPLETAR]
+            </code>
+            .
+          </p>
+        </div>
+
+        <Field id="happened" label="¿Qué pasó?" placeholder="La escena: qué te dijo el cliente, qué viste, qué salió mal" value={fields.happened} onChange={set("happened")} disabled={submitting} multiline />
+        <Field id="result" label="Dato o resultado real" placeholder="Ej: pasaron de 3 horas diarias a 20 minutos" value={fields.result} onChange={set("result")} disabled={submitting} />
+        <Field id="client" label="Cliente o rubro" placeholder="Ej: carnicería de barrio, 8 empleados" value={fields.client} onChange={set("client")} disabled={submitting} />
+
+        {!storyId && fields.happened.trim() ? (
+          <label className="flex items-start gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={saveAsStory}
+              onChange={(e) => setSaveAsStory(e.target.checked)}
+              disabled={submitting}
+              className="mt-0.5"
+            />
+            Guardar este caso en mi banco de historias para reusarlo en otras ideas
+          </label>
+        ) : null}
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
+        <p className={tooLong ? "text-sm text-destructive" : "text-xs text-muted-foreground"}>
+          {tooLong
+            ? `Muy largo: ${rawText.length}/${MAX_LENGTH} caracteres`
+            : "Después generás los 3 drafts desde Ideas."}
         </p>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="pillar">Pilar (opcional)</Label>
-        <Select
-          value={pillar}
-          onValueChange={(v) => setPillar(v as Pillar | "none")}
-          disabled={submitting}
-        >
-          <SelectTrigger id="pillar" className="w-full">
-            <SelectValue placeholder="Elegí un pilar" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">Sin clasificar</SelectItem>
-            <SelectItem value="caso">Caso real</SelectItem>
-            <SelectItem value="contrarian">Contrarian</SelectItem>
-            <SelectItem value="educativo">Educativo</SelectItem>
-            <SelectItem value="founder">Founder</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="flex gap-2">
-        <Button type="submit" disabled={submitting}>
-          {submitting ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Guardando...
-            </>
-          ) : (
-            "Guardar idea"
-          )}
+        <Button type="submit" size="lg" disabled={submitting || tooLong}>
+          {submitting ? <Loader2 className="animate-spin" /> : null}
+          Guardar idea
         </Button>
       </div>
     </form>
+  )
+}
+
+function Field({
+  id,
+  label,
+  placeholder,
+  value,
+  onChange,
+  disabled,
+  multiline,
+}: {
+  id: string
+  label: string
+  placeholder: string
+  value: string
+  onChange: (v: string) => void
+  disabled?: boolean
+  multiline?: boolean
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      {multiline ? (
+        <Textarea id={id} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} rows={2} disabled={disabled} />
+      ) : (
+        <Input id={id} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} disabled={disabled} />
+      )}
+    </div>
   )
 }

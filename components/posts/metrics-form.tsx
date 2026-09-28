@@ -68,8 +68,8 @@ export function MetricsForm({ post }: MetricsFormProps) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm" variant="outline">
-          <BarChart3 className="w-3.5 h-3.5 mr-1.5" />
-          Métricas
+          <BarChart3 />
+          {post.metrics_updated_at ? "Métricas" : "Cargar métricas"}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">

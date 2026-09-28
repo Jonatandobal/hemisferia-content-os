@@ -36,6 +36,17 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Si Publora lo va a publicar solo, registrarlo a mano lo duplicaría.
+    if (draft.publora_status === "scheduled") {
+      return NextResponse.json(
+        {
+          error:
+            "Este draft ya está programado en LinkedIn vía Publora. Quitá la programación si querés publicarlo a mano.",
+        },
+        { status: 409 },
+      )
+    }
+
     // Crear post
     const publishedAt =
       parsed.data.published_at ?? new Date().toISOString()

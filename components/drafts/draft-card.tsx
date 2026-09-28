@@ -1,83 +1,116 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useRef, useState } from "react"
+import Link from "next/link"
 import Image from "next/image"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { toast } from "sonner"
-import {
-  Copy,
-  Check,
-  ThumbsUp,
-  ThumbsDown,
-  Loader2,
-  Sparkles,
-  ImageIcon,
-  RefreshCw,
-} from "lucide-react"
-import { formatDistanceToNow } from "date-fns"
+import { useRouter } from "next/navigation"
+import { format, formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
-import type { Draft } from "@/lib/types"
+import {
+  CalendarDays,
+  Check,
+  Copy,
+  ImageIcon,
+  Loader2,
+  Pencil,
+  RefreshCw,
+  RotateCcw,
+  Send,
+  ThumbsDown,
+  ThumbsUp,
+} from "lucide-react"
+import { toast } from "sonner"
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import { DraftStatusBadge, PillarBadge } from "@/components/common/badges"
+import { type Draft, draftTemplate } from "@/lib/types"
+import { findPlaceholders } from "@/lib/post-format"
+import { lintPost } from "@/lib/post-lint"
+import { HOOK_FORMULAS, type HookFormula } from "@/lib/hook-formulas"
+import { LINKEDIN_FOLD, PostText } from "./post-text"
 import { UploadImageButton } from "./upload-image-button"
 import { LinkedInPreview } from "./linkedin-preview"
 import { PostNowButton } from "./post-now-button"
 
+const LINKEDIN_MAX = 3000
+
 interface DraftCardProps {
   draft: Draft
+  // Contexto de la idea cuando la card se muestra fuera de su grupo
+  ideaText?: string
+  focused?: boolean
 }
 
-export function DraftCard({ draft }: DraftCardProps) {
-  const router = useRouter()
-  const [busy, setBusy] = useState<
-    null | "approve" | "reject" | "copy" | "image"
-  >(null)
-  const [copied, setCopied] = useState(false)
+type Busy = null | "approve" | "reject" | "restore" | "image" | "save"
 
-  async function updateStatus(status: "approved" | "rejected") {
-    setBusy(status === "approved" ? "approve" : "reject")
+export function DraftCard({ draft, ideaText, focused }: DraftCardProps) {
+  const router = useRouter()
+  const ref = useRef<HTMLElement>(null)
+  const [busy, setBusy] = useState<Busy>(null)
+  const [copied, setCopied] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [text, setText] = useState(draft.content)
+
+  useEffect(() => {
+    if (focused) ref.current?.scrollIntoView({ behavior: "smooth", block: "center" })
+  }, [focused])
+
+  async function patch(body: Record<string, unknown>, kind: Busy, ok: string) {
+    setBusy(kind)
     try {
       const res = await fetch(`/api/drafts/${draft.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify(body),
       })
-      if (!res.ok) throw new Error("No se pudo actualizar")
-      toast.success(status === "approved" ? "Draft aprobado" : "Draft descartado")
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? "No se pudo actualizar")
+      toast.success(ok)
+      if (data.publora?.message) toast.warning(data.publora.message)
       router.refresh()
+      return true
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error")
+      return false
     } finally {
       setBusy(null)
     }
   }
 
+  function startEdit() {
+    setText(draft.content)
+    setEditing(true)
+  }
+
+  async function saveText() {
+    if (text.trim().length < 10) {
+      toast.error("El post quedó demasiado corto")
+      return
+    }
+    if (await patch({ content: text.trim() }, "save", "Cambios guardados")) {
+      setEditing(false)
+    }
+  }
+
   async function handleCopy() {
-    setBusy("copy")
     try {
       await navigator.clipboard.writeText(draft.content)
       setCopied(true)
-      toast.success("Copiado al portapapeles")
+      toast.success("Texto copiado")
       setTimeout(() => setCopied(false), 2000)
     } catch {
       toast.error("No se pudo copiar")
-    } finally {
-      setBusy(null)
     }
   }
 
   async function handleGenerateImage() {
     setBusy("image")
     try {
-      const res = await fetch(`/api/drafts/${draft.id}/image`, {
-        method: "POST",
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error ?? "No se pudo generar")
-      }
-      toast.success("Imagen generada ✨")
+      const res = await fetch(`/api/drafts/${draft.id}/image`, { method: "POST" })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? "No se pudo generar")
+      toast.success("Imagen lista")
       router.refresh()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error")
@@ -86,159 +119,267 @@ export function DraftCard({ draft }: DraftCardProps) {
     }
   }
 
-  const variantLabel = ["Caso real", "Contrarian", "Educativo"][draft.variant - 1] ?? `V${draft.variant}`
+  const template = draftTemplate(draft)
+  const placeholders = findPlaceholders(draft.content)
+  const lintIssues = lintPost(editing ? text : draft.content)
+  const hookFormula = draft.hook_formula
+    ? HOOK_FORMULAS[draft.hook_formula as HookFormula]
+    : null
   const isPending = draft.status === "draft"
   const isApproved = draft.status === "approved"
   const isRejected = draft.status === "rejected"
+  const isPublished = draft.status === "published"
+  const isScheduled = isApproved && !!draft.scheduled_for
+  const autoPublish = draft.publora_status === "scheduled"
+  const canEdit = !isPublished && !autoPublish
+  const canTouchImage = !isRejected && !isPublished
 
   return (
-    <Card
-      className={
-        isRejected
-          ? "opacity-50"
-          : isApproved
-            ? "border-emerald-500/50"
-            : ""
-      }
+    <article
+      ref={ref}
+      id={`draft-${draft.id}`}
+      className={cn(
+        "rounded-2xl border bg-card transition-shadow",
+        focused ? "border-primary ring-4 ring-primary/10" : "border-border",
+        isRejected && "opacity-60",
+      )}
     >
-      <CardContent className="p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-3.5 h-3.5 text-muted-foreground" />
-            <span className="text-xs font-medium text-muted-foreground">
-              Variante {draft.variant} · {variantLabel}
-            </span>
-          </div>
-          <Badge
-            variant={isApproved ? "default" : "outline"}
-            className="text-xs"
-          >
-            {draft.status}
-          </Badge>
-        </div>
+      {/* Encabezado */}
+      <div className="flex items-center gap-2 flex-wrap px-4 pt-4 md:px-5">
+        <PillarBadge pillar={template} />
+        <DraftStatusBadge status={draft.status} scheduled={isScheduled} />
+        <span className="text-xs text-muted-foreground ml-auto text-right">
+          Variante {draft.variant}
+          {hookFormula ? ` · ${hookFormula.label}` : ""} ·{" "}
+          {formatDistanceToNow(new Date(draft.created_at), {
+            addSuffix: true,
+            locale: es,
+          })}
+        </span>
+      </div>
 
-        <div className="text-sm leading-relaxed whitespace-pre-wrap bg-muted/40 rounded-md p-3 border">
-          {draft.content}
-        </div>
+      {ideaText ? (
+        <p className="px-4 md:px-5 pt-2 text-xs text-muted-foreground line-clamp-1">
+          Idea: {ideaText}
+        </p>
+      ) : null}
 
-        {/* Imagen generada por DALL-E si existe */}
-        {draft.image_url ? (
+      {/* Texto */}
+      <div className="px-4 py-4 md:px-5">
+        {editing ? (
           <div className="space-y-2">
-            <div className="relative aspect-[16/9] rounded-md overflow-hidden border bg-muted">
-              <Image
-                src={draft.image_url}
-                alt="Imagen generada para el post"
-                fill
-                sizes="(max-width: 768px) 100vw, 600px"
-                className="object-cover"
-                unoptimized // URLs de DALL-E expiran en 60min y no son CDN-optimizables
-              />
-            </div>
-            {draft.image_prompt ? (
-              <p className="text-[10px] text-muted-foreground italic line-clamp-2">
-                Prompt: {draft.image_prompt}
+            <Textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              rows={14}
+              autoFocus
+              className="text-[15px] leading-relaxed"
+            />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p
+                className={cn(
+                  "text-xs tabular-nums",
+                  text.length > LINKEDIN_MAX ? "text-destructive" : "text-muted-foreground",
+                )}
+              >
+                {text.length.toLocaleString("es-AR")} / {LINKEDIN_MAX.toLocaleString("es-AR")} caracteres ·
+                los primeros {LINKEDIN_FOLD} se ven antes de &quot;ver más&quot;
               </p>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setText(draft.content)
+                    setEditing(false)
+                  }}
+                  disabled={busy === "save"}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={saveText}
+                  disabled={busy === "save" || text.length > LINKEDIN_MAX}
+                >
+                  {busy === "save" ? <Loader2 className="animate-spin" /> : <Check />}
+                  Guardar
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <PostText content={draft.content} />
+        )}
+      </div>
+
+      {/* Avisos */}
+      {!editing &&
+      (placeholders.length > 0 || lintIssues.length > 0 || autoPublish || draft.publora_error) ? (
+        <div className="px-4 md:px-5 pb-4 space-y-2">
+          {lintIssues.length > 0 && !isRejected && !isPublished ? (
+            <div className="space-y-1.5 rounded-xl border border-border bg-secondary/50 px-3 py-2">
+              <p className="text-xs font-medium text-muted-foreground">
+                Revisión automática — {lintIssues.length}{" "}
+                {lintIssues.length === 1 ? "punto" : "puntos"} contra las reglas del prompt
+              </p>
+              <ul className="space-y-1">
+                {lintIssues.map((issue) => (
+                  <li
+                    key={issue.id}
+                    className={cn(
+                      "text-xs leading-relaxed",
+                      issue.severity === "error" ? "text-destructive" : "text-muted-foreground",
+                    )}
+                  >
+                    {issue.severity === "error" ? "● " : "○ "}
+                    {issue.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {placeholders.length > 0 && !isRejected ? (
+            <div className="flex items-center justify-between gap-3 rounded-xl bg-warning-soft px-3 py-2 text-sm text-warning">
+              <span>
+                {placeholders.length === 1
+                  ? "Falta 1 dato real"
+                  : `Faltan ${placeholders.length} datos reales`}{" "}
+                antes de publicar.
+              </span>
+              {canEdit ? (
+                <Button size="sm" variant="outline" onClick={startEdit}>
+                  <Pencil />
+                  Completar
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+          {autoPublish && draft.scheduled_for ? (
+            <div className="flex items-center gap-2 rounded-xl bg-success-soft px-3 py-2 text-sm text-success">
+              <Send className="w-4 h-4 shrink-0" />
+              Se publica solo el{" "}
+              {format(new Date(draft.scheduled_for), "EEEE d 'de' MMMM, HH:mm 'hs'", { locale: es })}
+            </div>
+          ) : draft.publora_error ? (
+            <div className="rounded-xl bg-warning-soft px-3 py-2 text-sm text-warning">
+              {draft.publora_error}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* Imagen */}
+      {draft.image_url ? (
+        <div className="px-4 md:px-5 pb-4">
+          <div className="group relative aspect-[1.91/1] overflow-hidden rounded-xl border border-border bg-muted">
+            <Image
+              src={draft.image_url}
+              alt="Imagen del post"
+              fill
+              sizes="(max-width: 768px) 100vw, 640px"
+              className="object-cover"
+              unoptimized // Se sirve directo desde Supabase Storage
+            />
+            {canTouchImage ? (
+              <div className="absolute inset-x-0 bottom-0 flex justify-end gap-2 bg-gradient-to-t from-black/50 to-transparent p-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                <Button size="sm" variant="secondary" onClick={handleGenerateImage} disabled={busy !== null}>
+                  {busy === "image" ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+                  Otra con IA
+                </Button>
+                <UploadImageButton draftId={draft.id} disabled={busy !== null} label="Reemplazar" />
+              </div>
             ) : null}
           </div>
-        ) : null}
-
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <span className="text-xs text-muted-foreground">
-            {formatDistanceToNow(new Date(draft.created_at), {
-              addSuffix: true,
-              locale: es,
-            })}
+        </div>
+      ) : canTouchImage ? (
+        <div className="mx-4 md:mx-5 mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-dashed border-border px-3 py-2.5">
+          <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+            <ImageIcon className="w-4 h-4" />
+            Imagen (opcional)
           </span>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleGenerateImage}
-              disabled={busy !== null}
-              title={
-                draft.image_url
-                  ? "Regenerar imagen"
-                  : "Generar imagen con IA"
-              }
-            >
-              {busy === "image" ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                  Generando...
-                </>
-              ) : draft.image_url ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
-                  Nueva imagen
-                </>
-              ) : (
-                <>
-                  <ImageIcon className="w-3.5 h-3.5 mr-1.5" />
-                  Imagen IA
-                </>
-              )}
+          <div className="flex gap-2">
+            <Button size="sm" variant="ghost" onClick={handleGenerateImage} disabled={busy !== null}>
+              {busy === "image" ? <Loader2 className="animate-spin" /> : <ImageIcon />}
+              {busy === "image" ? "Generando…" : "Generar con IA"}
             </Button>
-
-            <UploadImageButton
-              draftId={draft.id}
-              disabled={busy !== null}
-            />
-
-            <LinkedInPreview draft={draft} />
-
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleCopy}
-              disabled={busy !== null}
-            >
-              {copied ? (
-                <>
-                  <Check className="w-3.5 h-3.5 mr-1.5" />
-                  Copiado
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5 mr-1.5" />
-                  Copiar
-                </>
-              )}
-            </Button>
-
-            {isPending && (
-              <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => updateStatus("rejected")}
-                  disabled={busy !== null}
-                >
-                  {busy === "reject" ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <ThumbsDown className="w-3.5 h-3.5" />
-                  )}
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => updateStatus("approved")}
-                  disabled={busy !== null}
-                >
-                  {busy === "approve" ? (
-                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                  ) : (
-                    <ThumbsUp className="w-3.5 h-3.5 mr-1.5" />
-                  )}
-                  Aprobar
-                </Button>
-              </>
-            )}
-
-            {isApproved && <PostNowButton draft={draft} />}
+            <UploadImageButton draftId={draft.id} disabled={busy !== null} />
           </div>
         </div>
-      </CardContent>
-    </Card>
+      ) : null}
+
+      {/* Acciones */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-2.5 md:px-4">
+        <div className="flex items-center gap-1">
+          <Button size="sm" variant="ghost" onClick={handleCopy}>
+            {copied ? <Check /> : <Copy />}
+            {copied ? "Copiado" : "Copiar"}
+          </Button>
+          <LinkedInPreview draft={draft} />
+          {canEdit && !editing ? (
+            <Button size="sm" variant="ghost" onClick={startEdit}>
+              <Pencil />
+              Editar
+            </Button>
+          ) : null}
+        </div>
+
+        <div className="flex items-center gap-2 ml-auto">
+          {isPending ? (
+            <>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => patch({ status: "rejected" }, "reject", "Draft descartado")}
+                disabled={busy !== null}
+              >
+                {busy === "reject" ? <Loader2 className="animate-spin" /> : <ThumbsDown />}
+                Descartar
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => patch({ status: "approved" }, "approve", "Aprobado. Ahora elegile un día.")}
+                disabled={busy !== null}
+              >
+                {busy === "approve" ? <Loader2 className="animate-spin" /> : <ThumbsUp />}
+                Aprobar
+              </Button>
+            </>
+          ) : null}
+
+          {isApproved ? (
+            <>
+              <Button asChild size="sm" variant="outline">
+                <Link href={`/calendar?draft=${draft.id}`}>
+                  <CalendarDays />
+                  {isScheduled
+                    ? format(new Date(draft.scheduled_for!), "EEE d MMM, HH:mm", { locale: es })
+                    : "Programar"}
+                </Link>
+              </Button>
+              {!autoPublish ? <PostNowButton draft={draft} /> : null}
+            </>
+          ) : null}
+
+          {isRejected ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => patch({ status: "draft" }, "restore", "Draft recuperado")}
+              disabled={busy !== null}
+            >
+              {busy === "restore" ? <Loader2 className="animate-spin" /> : <RotateCcw />}
+              Recuperar
+            </Button>
+          ) : null}
+
+          {isPublished ? (
+            <Button asChild size="sm" variant="outline">
+              <Link href="/analytics">Ver métricas</Link>
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    </article>
   )
 }

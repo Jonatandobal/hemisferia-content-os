@@ -15,15 +15,18 @@ import {
   Tailwind,
   Text,
 } from "@react-email/components"
-import { format } from "date-fns"
-import { es } from "date-fns/locale"
+import { formatLongDate, formatTime } from "@/lib/timezone"
+import { type Pillar, PILLAR_LABELS, draftTemplate } from "@/lib/types"
 
 interface DraftPreview {
   id: string
   variant: number
+  template: Pillar | null
   content: string
   scheduled_for: string | null
   image_url: string | null
+  // true = Publora lo publica solo a la hora programada
+  auto_publish: boolean
 }
 
 interface DailyReminderEmailProps {
@@ -37,8 +40,7 @@ export default function DailyReminderEmail({
   date,
   drafts,
 }: DailyReminderEmailProps) {
-  const dateLabel = format(date, "EEEE d 'de' MMMM", { locale: es })
-  const variantLabels = ["Caso real", "Contrarian", "Educativo", "Founder"]
+  const dateLabel = formatLongDate(date)
   const previewText = `Tenés ${drafts.length} ${drafts.length === 1 ? "post" : "posts"} para publicar hoy`
 
   return (
@@ -67,15 +69,18 @@ export default function DailyReminderEmail({
 
               {drafts.map((draft, i) => {
                 const hour = draft.scheduled_for
-                  ? format(new Date(draft.scheduled_for), "HH:mm")
+                  ? formatTime(new Date(draft.scheduled_for))
                   : "—"
-                const variantLabel =
-                  variantLabels[draft.variant - 1] ?? `V${draft.variant}`
+                const template = draftTemplate(draft)
+                const variantLabel = template
+                  ? PILLAR_LABELS[template]
+                  : `V${draft.variant}`
 
                 return (
                   <Section key={draft.id} className="mb-6">
                     <Text className="text-xs uppercase tracking-wider text-gray-500 m-0 mb-2 font-semibold">
                       {i + 1}. {hour} hs · {variantLabel}
+                      {draft.auto_publish ? " · se publica solo" : ""}
                     </Text>
 
                     {draft.image_url ? (
@@ -96,7 +101,7 @@ export default function DailyReminderEmail({
                       href={`${appUrl}/drafts?focus=${draft.id}`}
                       className="inline-block bg-gray-900 text-white px-4 py-2 rounded-md text-sm font-semibold no-underline"
                     >
-                      Postear ahora →
+                      {draft.auto_publish ? "Ver draft →" : "Postear ahora →"}
                     </Link>
 
                     {i < drafts.length - 1 ? (

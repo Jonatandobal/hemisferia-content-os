@@ -13,6 +13,18 @@ export interface Idea {
   pillar: Pillar | null
   status: IdeaStatus
   created_at: string
+  story_id?: string | null
+}
+
+export interface Story {
+  id: string
+  title: string
+  situation: string
+  result: string | null
+  client_type: string | null
+  pillar: Pillar | null
+  times_used: number
+  created_at: string
 }
 
 export interface Draft {
@@ -23,9 +35,14 @@ export interface Draft {
   status: DraftStatus
   scheduled_for: string | null
   created_at: string
+  template?: Pillar | null
+  hook_formula?: string | null
   image_url?: string | null
   image_prompt?: string | null
   image_generated_at?: string | null
+  publora_post_group_id?: string | null
+  publora_status?: "scheduled" | "published" | "failed" | null
+  publora_error?: string | null
 }
 
 export interface Post {
@@ -58,9 +75,55 @@ export const PILLAR_LABELS: Record<Pillar, string> = {
   founder: "Founder",
 }
 
-export const PILLAR_COLORS: Record<Pillar, string> = {
-  caso: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-  contrarian: "bg-orange-500/10 text-orange-500 border-orange-500/20",
-  educativo: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-  founder: "bg-purple-500/10 text-purple-500 border-purple-500/20",
+export const PILLAR_SHORT_LABELS: Record<Pillar, string> = {
+  caso: "Caso",
+  contrarian: "Contra",
+  educativo: "Educ",
+  founder: "Founder",
+}
+
+// Los drafts previos a la columna `template` no la tienen: se asumía
+// por posición (1 = caso, 2 = contrarian, 3 = educativo).
+const LEGACY_VARIANT_TEMPLATES: Pillar[] = ["caso", "contrarian", "educativo"]
+
+export function draftTemplate(
+  draft: Pick<Draft, "template" | "variant">,
+): Pillar | null {
+  return draft.template ?? LEGACY_VARIANT_TEMPLATES[draft.variant - 1] ?? null
+}
+
+// Color de identidad de cada pilar (tokens --pillar-* en globals.css).
+// Siempre se muestra junto a la etiqueta de texto, nunca solo.
+export const PILLAR_DOT: Record<Pillar, string> = {
+  caso: "bg-pillar-caso",
+  contrarian: "bg-pillar-contrarian",
+  educativo: "bg-pillar-educativo",
+  founder: "bg-pillar-founder",
+}
+
+export const PILLAR_COLOR_VAR: Record<Pillar, string> = {
+  caso: "var(--pillar-caso)",
+  contrarian: "var(--pillar-contrarian)",
+  educativo: "var(--pillar-educativo)",
+  founder: "var(--pillar-founder)",
+}
+
+export const PILLAR_DESCRIPTIONS: Record<Pillar, string> = {
+  caso: "Algo que pasó con un cliente",
+  contrarian: "Una opinión que va contra la corriente",
+  educativo: "Explicar un concepto en criollo",
+  founder: "Detrás de escena de Hemisferia",
+}
+
+export const IDEA_STATUS_LABELS: Record<IdeaStatus, string> = {
+  pending: "Sin drafts",
+  generated: "Con drafts",
+  archived: "Archivada",
+}
+
+export const DRAFT_STATUS_LABELS: Record<DraftStatus, string> = {
+  draft: "Por revisar",
+  approved: "Aprobado",
+  rejected: "Descartado",
+  published: "Publicado",
 }

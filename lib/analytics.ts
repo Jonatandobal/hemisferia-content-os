@@ -1,11 +1,12 @@
 // Helpers para calcular métricas de analytics de posts publicados.
 
-import type { Pillar, Post } from "@/lib/types"
+import { type Pillar, type Post, draftTemplate } from "@/lib/types"
 
 export interface PostWithDraft extends Post {
   draft?: {
     id: string
     variant: number
+    template?: Pillar | null
     idea?: {
       pillar: Pillar | null
     } | null
@@ -48,7 +49,12 @@ export function computeStatsByPillar(posts: PostWithDraft[]): PillarStats[] {
   }
 
   for (const post of posts) {
-    const pillar = post.draft?.idea?.pillar ?? "sin_pilar"
+    // Agrupamos por el formato del post publicado (cada idea genera
+    // variantes de formatos distintos); el pilar de la idea es el respaldo.
+    const pillar =
+      (post.draft ? draftTemplate(post.draft) : null) ??
+      post.draft?.idea?.pillar ??
+      "sin_pilar"
     const stats = map.get(pillar)!
     stats.count += 1
     stats.total_impressions += post.impressions ?? 0

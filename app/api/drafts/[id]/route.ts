@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { syncDraftToPublora } from "@/lib/publora-sync"
 
 // PATCH /api/drafts/[id] — actualizar status / contenido de un draft
 const updateSchema = z.object({
@@ -41,7 +42,11 @@ export async function PATCH(
       )
     }
 
-    return NextResponse.json({ draft: data })
+    // Si cambió el texto, el estado o la fecha, reflejarlo en Publora
+    // (ej: rechazar un draft programado cancela su publicación).
+    const publora = await syncDraftToPublora(supabase, id)
+
+    return NextResponse.json({ draft: data, publora })
   } catch (err) {
     console.error("Unexpected error:", err)
     return NextResponse.json({ error: "Error inesperado" }, { status: 500 })

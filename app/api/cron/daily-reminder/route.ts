@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
 import { render } from "@react-email/render"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { dayRangeInTimeZone } from "@/lib/timezone"
+import { reconcilePubloraPosts } from "@/lib/publora-sync"
 import DailyReminderEmail from "@/emails/daily-reminder"
 
 export const maxDuration = 30
@@ -19,20 +21,22 @@ export async function GET(req: NextRequest) {
   try {
     const supabase = createAdminClient()
 
-    // Rango del día actual (UTC) — en Vercel Cron Argentina sería UTC-3
+    // Registrar lo que Publora publicó desde la última corrida
+    await reconcilePubloraPosts(supabase)
+
+    // Rango del día actual en hora argentina (Vercel corre en UTC)
     const now = new Date()
-    const startOfDay = new Date(now)
-    startOfDay.setUTCHours(0, 0, 0, 0)
-    const endOfDay = new Date(now)
-    endOfDay.setUTCHours(23, 59, 59, 999)
+    const { start, end } = dayRangeInTimeZone(now)
 
     // Drafts approved + scheduled_for en el día de hoy
     const { data: drafts, error } = await supabase
       .from("drafts")
-      .select("id, variant, content, scheduled_for, image_url")
+      .select(
+        "id, variant, template, content, scheduled_for, image_url, publora_status",
+      )
       .eq("status", "approved")
-      .gte("scheduled_for", startOfDay.toISOString())
-      .lte("scheduled_for", endOfDay.toISOString())
+      .gte("scheduled_for", start.toISOString())
+      .lt("scheduled_for", end.toISOString())
       .order("scheduled_for", { ascending: true })
 
     if (error) {
@@ -72,9 +76,11 @@ export async function GET(req: NextRequest) {
         drafts: drafts.map((d) => ({
           id: d.id,
           variant: d.variant,
+          template: d.template,
           content: d.content,
           scheduled_for: d.scheduled_for,
           image_url: d.image_url,
+          auto_publish: d.publora_status === "scheduled",
         })),
       }),
     )

@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label"
 import { Send, Check, ExternalLink, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import type { Draft } from "@/lib/types"
+import { findPlaceholders } from "@/lib/post-format"
 
 interface PostNowButtonProps {
   draft: Draft
@@ -27,6 +28,7 @@ export function PostNowButton({ draft }: PostNowButtonProps) {
   const [step, setStep] = useState<1 | 2>(1)
   const [busy, setBusy] = useState(false)
   const [linkedinUrl, setLinkedinUrl] = useState("")
+  const placeholders = findPlaceholders(draft.content)
 
   async function handleCopyAndOpen() {
     setBusy(true)
@@ -92,8 +94,8 @@ export function PostNowButton({ draft }: PostNowButtonProps) {
       }}
     >
       <Button size="sm" onClick={() => setOpen(true)}>
-        <Send className="w-3.5 h-3.5 mr-1.5" />
-        Postear
+        <Send />
+        Postear ahora
       </Button>
 
       <DialogContent className="max-w-md">
@@ -111,6 +113,13 @@ export function PostNowButton({ draft }: PostNowButtonProps) {
               <div className="text-sm bg-muted/50 rounded-md p-3 border max-h-40 overflow-y-auto whitespace-pre-wrap">
                 {draft.content}
               </div>
+              {placeholders.length > 0 ? (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  ⚠️ El texto tiene datos sin completar (
+                  {placeholders.join(" · ")}). Reemplazalos en LinkedIn antes
+                  de publicar.
+                </p>
+              ) : null}
               {draft.image_url ? (
                 <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                   <Check className="w-3.5 h-3.5 text-emerald-500" />
@@ -171,7 +180,8 @@ export function PostNowButton({ draft }: PostNowButtonProps) {
                   disabled={busy}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Después de publicar, click "..." en tu post → "Copiar link" →
+                  Después de publicar, click &quot;...&quot; en tu post →
+                  &quot;Copiar link&quot; →
                   pegalo acá.
                 </p>
               </div>
