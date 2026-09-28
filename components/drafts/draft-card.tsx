@@ -19,7 +19,8 @@ import {
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
-import type { Draft } from "@/lib/types"
+import { type Draft, PILLAR_LABELS, draftTemplate } from "@/lib/types"
+import { findPlaceholders } from "@/lib/post-format"
 import { UploadImageButton } from "./upload-image-button"
 import { LinkedInPreview } from "./linkedin-preview"
 import { PostNowButton } from "./post-now-button"
@@ -86,7 +87,9 @@ export function DraftCard({ draft }: DraftCardProps) {
     }
   }
 
-  const variantLabel = ["Caso real", "Contrarian", "Educativo"][draft.variant - 1] ?? `V${draft.variant}`
+  const template = draftTemplate(draft)
+  const variantLabel = template ? PILLAR_LABELS[template] : `V${draft.variant}`
+  const placeholders = findPlaceholders(draft.content)
   const isPending = draft.status === "draft"
   const isApproved = draft.status === "approved"
   const isRejected = draft.status === "rejected"
@@ -121,7 +124,15 @@ export function DraftCard({ draft }: DraftCardProps) {
           {draft.content}
         </div>
 
-        {/* Imagen generada por DALL-E si existe */}
+        {placeholders.length > 0 ? (
+          <p className="text-xs text-amber-600 dark:text-amber-400">
+            ⚠️ Faltan {placeholders.length}{" "}
+            {placeholders.length === 1 ? "dato" : "datos"} para completar antes
+            de publicar: {placeholders.join(" · ")}
+          </p>
+        ) : null}
+
+        {/* Imagen del post (generada con IA o subida a mano) */}
         {draft.image_url ? (
           <div className="space-y-2">
             <div className="relative aspect-[16/9] rounded-md overflow-hidden border bg-muted">
@@ -131,7 +142,7 @@ export function DraftCard({ draft }: DraftCardProps) {
                 fill
                 sizes="(max-width: 768px) 100vw, 600px"
                 className="object-cover"
-                unoptimized // URLs de DALL-E expiran en 60min y no son CDN-optimizables
+                unoptimized // Se sirve directo desde Supabase Storage
               />
             </div>
             {draft.image_prompt ? (

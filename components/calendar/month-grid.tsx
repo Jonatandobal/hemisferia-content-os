@@ -34,7 +34,7 @@ import {
 } from "date-fns"
 import { es } from "date-fns/locale"
 import { toast } from "sonner"
-import type { Draft } from "@/lib/types"
+import { type Draft, PILLAR_SHORT_LABELS, draftTemplate } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 interface MonthGridProps {
@@ -241,8 +241,10 @@ function DraftChip({
   busy: boolean
   onUnschedule: (e: React.MouseEvent) => void
 }) {
-  const labels = ["Caso", "Contra", "Educ"]
-  const variantLabel = labels[draft.variant - 1] ?? `V${draft.variant}`
+  const template = draftTemplate(draft)
+  const variantLabel = template
+    ? PILLAR_SHORT_LABELS[template]
+    : `V${draft.variant}`
   const hour = draft.scheduled_for
     ? format(new Date(draft.scheduled_for), "HH:mm")
     : null
