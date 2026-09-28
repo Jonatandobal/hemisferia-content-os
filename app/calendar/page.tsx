@@ -2,12 +2,16 @@ import { DashboardShell } from "@/components/layout/dashboard-shell"
 import { Header } from "@/components/layout/header"
 import { MonthGrid } from "@/components/calendar/month-grid"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { reconcilePubloraPosts } from "@/lib/publora-sync"
 import type { Draft } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
 
 async function getDraftsForCalendar() {
   const supabase = createAdminClient()
+
+  // Registrar lo que Publora ya publicó antes de armar el calendario
+  await reconcilePubloraPosts(supabase)
 
   const [scheduledRes, unscheduledRes] = await Promise.all([
     // Aprobados con scheduled_for (van al calendario)

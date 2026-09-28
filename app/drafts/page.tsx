@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { FileText, Sparkles } from "lucide-react"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { reconcilePubloraPosts } from "@/lib/publora-sync"
 import type { Draft, Idea } from "@/lib/types"
 import { PILLAR_LABELS, PILLAR_COLORS } from "@/lib/types"
 import { formatDistanceToNow } from "date-fns"
@@ -17,6 +18,9 @@ async function getDraftsGrouped(): Promise<
   { idea: Idea; drafts: Draft[] }[]
 > {
   const supabase = createAdminClient()
+
+  // Registrar lo que Publora ya publicó antes de listar
+  await reconcilePubloraPosts(supabase)
 
   // Traemos drafts ordenados, con la idea anidada vía join
   const { data, error } = await supabase

@@ -2,12 +2,16 @@ import { DashboardShell } from "@/components/layout/dashboard-shell"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { reconcilePubloraPosts } from "@/lib/publora-sync"
 import { Lightbulb, FileText, Send, TrendingUp } from "lucide-react"
 
 export const dynamic = "force-dynamic"
 
 async function getDashboardStats() {
   const supabase = createAdminClient()
+
+  // Registrar lo que Publora ya publicó antes de contar
+  await reconcilePubloraPosts(supabase)
 
   const [ideasRes, draftsRes, postsRes] = await Promise.all([
     supabase

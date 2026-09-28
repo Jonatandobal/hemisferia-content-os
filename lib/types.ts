@@ -27,6 +27,9 @@ export interface Draft {
   image_url?: string | null
   image_prompt?: string | null
   image_generated_at?: string | null
+  publora_post_group_id?: string | null
+  publora_status?: "scheduled" | "published" | "failed" | null
+  publora_error?: string | null
 }
 
 export interface Post {

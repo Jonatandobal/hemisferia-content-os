@@ -25,6 +25,8 @@ interface DraftPreview {
   content: string
   scheduled_for: string | null
   image_url: string | null
+  // true = Publora lo publica solo a la hora programada
+  auto_publish: boolean
 }
 
 interface DailyReminderEmailProps {
@@ -78,6 +80,7 @@ export default function DailyReminderEmail({
                   <Section key={draft.id} className="mb-6">
                     <Text className="text-xs uppercase tracking-wider text-gray-500 m-0 mb-2 font-semibold">
                       {i + 1}. {hour} hs · {variantLabel}
+                      {draft.auto_publish ? " · se publica solo" : ""}
                     </Text>
 
                     {draft.image_url ? (
@@ -98,7 +101,7 @@ export default function DailyReminderEmail({
                       href={`${appUrl}/drafts?focus=${draft.id}`}
                       className="inline-block bg-gray-900 text-white px-4 py-2 rounded-md text-sm font-semibold no-underline"
                     >
-                      Postear ahora →
+                      {draft.auto_publish ? "Ver draft →" : "Postear ahora →"}
                     </Link>
 
                     {i < drafts.length - 1 ? (

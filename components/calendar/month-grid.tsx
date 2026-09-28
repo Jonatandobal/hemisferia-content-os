@@ -79,11 +79,16 @@ export function MonthGrid({ scheduledDrafts, unscheduledDrafts }: MonthGridProps
         body: JSON.stringify({ scheduled_for: date.toISOString() }),
       })
       if (!res.ok) throw new Error("No se pudo programar")
-      toast.success("Draft programado", {
-        description: format(date, "EEEE d 'de' MMMM, HH:mm 'hs'", {
-          locale: es,
-        }),
-      })
+      const data = await res.json().catch(() => ({}))
+      const when = format(date, "EEEE d 'de' MMMM, HH:mm 'hs'", { locale: es })
+      toast.success(
+        data.publora?.state === "scheduled"
+          ? "Programado: se publica solo en LinkedIn"
+          : "Draft programado",
+        { description: when },
+      )
+      // Programado en la app pero no en LinkedIn (faltan datos, error, etc.)
+      if (data.publora?.message) toast.warning(data.publora.message)
       setSelectedDraft(null)
       router.refresh()
     } catch (err) {
@@ -99,8 +104,14 @@ export function MonthGrid({ scheduledDrafts, unscheduledDrafts }: MonthGridProps
       const res = await fetch(`/api/drafts/${draft.id}/schedule`, {
         method: "DELETE",
       })
-      if (!res.ok) throw new Error("No se pudo quitar")
-      toast.success("Programación quitada")
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? "No se pudo quitar")
+      toast.success(
+        data.publora?.state === "cancelled"
+          ? "Programación quitada (también en LinkedIn)"
+          : "Programación quitada",
+      )
+      if (data.publora?.message) toast.warning(data.publora.message)
       router.refresh()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error")

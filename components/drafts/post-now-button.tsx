@@ -180,7 +180,8 @@ export function PostNowButton({ draft }: PostNowButtonProps) {
                   disabled={busy}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Después de publicar, click "..." en tu post → "Copiar link" →
+                  Después de publicar, click &quot;...&quot; en tu post →
+                  &quot;Copiar link&quot; →
                   pegalo acá.
                 </p>
               </div>

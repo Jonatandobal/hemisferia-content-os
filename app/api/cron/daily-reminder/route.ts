@@ -3,6 +3,7 @@ import { Resend } from "resend"
 import { render } from "@react-email/render"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { dayRangeInTimeZone } from "@/lib/timezone"
+import { reconcilePubloraPosts } from "@/lib/publora-sync"
 import DailyReminderEmail from "@/emails/daily-reminder"
 
 export const maxDuration = 30
@@ -20,6 +21,9 @@ export async function GET(req: NextRequest) {
   try {
     const supabase = createAdminClient()
 
+    // Registrar lo que Publora publicó desde la última corrida
+    await reconcilePubloraPosts(supabase)
+
     // Rango del día actual en hora argentina (Vercel corre en UTC)
     const now = new Date()
     const { start, end } = dayRangeInTimeZone(now)
@@ -27,7 +31,9 @@ export async function GET(req: NextRequest) {
     // Drafts approved + scheduled_for en el día de hoy
     const { data: drafts, error } = await supabase
       .from("drafts")
-      .select("id, variant, template, content, scheduled_for, image_url")
+      .select(
+        "id, variant, template, content, scheduled_for, image_url, publora_status",
+      )
       .eq("status", "approved")
       .gte("scheduled_for", start.toISOString())
       .lt("scheduled_for", end.toISOString())
@@ -74,6 +80,7 @@ export async function GET(req: NextRequest) {
           content: d.content,
           scheduled_for: d.scheduled_for,
           image_url: d.image_url,
+          auto_publish: d.publora_status === "scheduled",
         })),
       }),
     )

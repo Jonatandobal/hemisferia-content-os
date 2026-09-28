@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { syncDraftToPublora } from "@/lib/publora-sync"
 
 // POST /api/drafts/[id]/schedule — programar un draft para una fecha/hora.
 // DELETE /api/drafts/[id]/schedule — quitar la programación.
@@ -44,7 +45,10 @@ export async function POST(
       )
     }
 
-    return NextResponse.json({ draft: data })
+    // Programar (o reprogramar) también en LinkedIn vía Publora
+    const publora = await syncDraftToPublora(supabase, id)
+
+    return NextResponse.json({ draft: data, publora })
   } catch (err) {
     console.error("Unexpected error:", err)
     return NextResponse.json({ error: "Error inesperado" }, { status: 500 })
@@ -74,7 +78,10 @@ export async function DELETE(
       )
     }
 
-    return NextResponse.json({ draft: data })
+    // Cancelar el post programado en Publora, si había
+    const publora = await syncDraftToPublora(supabase, id)
+
+    return NextResponse.json({ draft: data, publora })
   } catch (err) {
     console.error("Unexpected error:", err)
     return NextResponse.json({ error: "Error inesperado" }, { status: 500 })

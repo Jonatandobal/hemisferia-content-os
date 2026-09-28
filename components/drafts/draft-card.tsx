@@ -17,7 +17,7 @@ import {
   ImageIcon,
   RefreshCw,
 } from "lucide-react"
-import { formatDistanceToNow } from "date-fns"
+import { format, formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
 import { type Draft, PILLAR_LABELS, draftTemplate } from "@/lib/types"
 import { findPlaceholders } from "@/lib/post-format"
@@ -46,6 +46,8 @@ export function DraftCard({ draft }: DraftCardProps) {
       })
       if (!res.ok) throw new Error("No se pudo actualizar")
       toast.success(status === "approved" ? "Draft aprobado" : "Draft descartado")
+      const data = await res.json().catch(() => ({}))
+      if (data.publora?.message) toast.warning(data.publora.message)
       router.refresh()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error")
@@ -129,6 +131,20 @@ export function DraftCard({ draft }: DraftCardProps) {
             ⚠️ Faltan {placeholders.length}{" "}
             {placeholders.length === 1 ? "dato" : "datos"} para completar antes
             de publicar: {placeholders.join(" · ")}
+          </p>
+        ) : null}
+
+        {draft.publora_status === "scheduled" && draft.scheduled_for ? (
+          <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+            <Check className="w-3.5 h-3.5" />
+            Se publica solo en LinkedIn el{" "}
+            {format(new Date(draft.scheduled_for), "EEEE d 'de' MMMM, HH:mm 'hs'", {
+              locale: es,
+            })}
+          </p>
+        ) : draft.publora_error ? (
+          <p className="text-xs text-amber-600 dark:text-amber-400">
+            ⚠️ {draft.publora_error}
           </p>
         ) : null}
 
@@ -246,7 +262,9 @@ export function DraftCard({ draft }: DraftCardProps) {
               </>
             )}
 
-            {isApproved && <PostNowButton draft={draft} />}
+            {isApproved && draft.publora_status !== "scheduled" && (
+              <PostNowButton draft={draft} />
+            )}
           </div>
         </div>
       </CardContent>

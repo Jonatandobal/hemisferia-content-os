@@ -3,6 +3,7 @@ import { generateText } from "ai"
 import { openai } from "@ai-sdk/openai"
 import OpenAI from "openai"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { syncDraftToPublora } from "@/lib/publora-sync"
 import { IMAGE_BRIEF_SYSTEM_PROMPT } from "@/lib/image-prompts"
 
 export const maxDuration = 60
@@ -169,9 +170,13 @@ export async function POST(
       )
     }
 
+    // Si el draft ya estaba programado, reprogramarlo con la imagen nueva
+    const publora = await syncDraftToPublora(supabase, id)
+
     return NextResponse.json({
       image_url: imageUrl,
       image_prompt: cleanPrompt,
+      publora,
     })
   } catch (err) {
     console.error("Generate image error:", err)
