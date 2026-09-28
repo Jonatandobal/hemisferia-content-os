@@ -1,4 +1,4 @@
-import { DashboardShell } from "@/components/layout/dashboard-shell"
+import { DashboardShell, PageBody } from "@/components/layout/dashboard-shell"
 import { Header } from "@/components/layout/header"
 import { MonthGrid } from "@/components/calendar/month-grid"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -21,7 +21,7 @@ async function getDraftsForCalendar() {
       .eq("status", "approved")
       .not("scheduled_for", "is", null)
       .order("scheduled_for", { ascending: true }),
-    // Aprobados sin programar (van al drawer)
+    // Aprobados sin programar (van a la bandeja)
     supabase
       .from("drafts")
       .select("*")
@@ -37,24 +37,27 @@ async function getDraftsForCalendar() {
   }
 }
 
-export default async function CalendarPage() {
+export default async function CalendarPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ draft?: string }>
+}) {
+  const { draft: draftParam } = await searchParams
   const { scheduled, unscheduled } = await getDraftsForCalendar()
 
   return (
     <DashboardShell>
       <Header
         title="Calendario"
-        description="Programá los drafts aprobados día por día"
-        showNewIdea={false}
+        description="Elegí un draft aprobado y tocá el día en que querés que salga."
       />
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-5xl mx-auto">
-          <MonthGrid
-            scheduledDrafts={scheduled}
-            unscheduledDrafts={unscheduled}
-          />
-        </div>
-      </div>
+      <PageBody width="wide">
+        <MonthGrid
+          scheduledDrafts={scheduled}
+          unscheduledDrafts={unscheduled}
+          initialSelectedId={draftParam}
+        />
+      </PageBody>
     </DashboardShell>
   )
 }

@@ -4,7 +4,6 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent } from "@/components/ui/card"
 import { Loader2, Radar, Sparkles } from "lucide-react"
 import { toast } from "sonner"
 
@@ -52,9 +51,8 @@ export function TrendsSearchForm() {
   }
 
   return (
-    <Card>
-      <CardContent className="p-4 space-y-4">
-        <form onSubmit={handleSearch} className="flex gap-2">
+    <div className="rounded-2xl border border-border bg-card p-4 md:p-5 space-y-4">
+        <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-2">
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -65,12 +63,12 @@ export function TrendsSearchForm() {
           <Button type="submit" disabled={loading}>
             {loading ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Buscando...
+                <Loader2 className="animate-spin" />
+                Buscando… (~30s)
               </>
             ) : (
               <>
-                <Radar className="w-4 h-4 mr-2" />
+                <Radar />
                 Buscar tendencias
               </>
             )}
@@ -89,7 +87,7 @@ export function TrendsSearchForm() {
                 type="button"
                 onClick={() => setQuery(preset)}
                 disabled={loading}
-                className="text-xs px-2.5 py-1 rounded-full border border-border hover:bg-accent transition-colors disabled:opacity-50"
+                className="text-xs h-7 px-3 rounded-full border border-border bg-background hover:bg-secondary transition-colors disabled:opacity-50"
               >
                 {preset}
               </button>
@@ -98,11 +96,10 @@ export function TrendsSearchForm() {
         </div>
 
         <div className="text-xs text-muted-foreground border-t pt-3">
-          Cada búsqueda combina <strong>Google Trends Argentina</strong> +{" "}
-          <strong>Google News últimos días</strong> + GPT-4o para detectar
-          tendencias accionables. Ojo: SerpAPI gratis tiene 100 búsquedas/mes.
+          Cruza <strong>Google Trends Argentina</strong> y{" "}
+          <strong>Google News</strong> de los últimos días. Cada búsqueda usa 2
+          de las 100 consultas gratis por mes de SerpAPI.
         </div>
-      </CardContent>
-    </Card>
+    </div>
   )
 }

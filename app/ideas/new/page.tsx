@@ -1,4 +1,4 @@
-import { DashboardShell } from "@/components/layout/dashboard-shell"
+import { DashboardShell, PageBody } from "@/components/layout/dashboard-shell"
 import { Header } from "@/components/layout/header"
 import { NewIdeaForm } from "@/components/ideas/new-idea-form"
 
@@ -7,12 +7,11 @@ export default function NewIdeaPage() {
     <DashboardShell>
       <Header
         title="Nueva idea"
-        description="Capturá una idea cruda. Después la IA arma 3 variantes de post."
-        showNewIdea={false}
+        description="Una frase alcanza. Con hechos reales, los drafts salen mucho mejores."
       />
-      <div className="flex-1 overflow-y-auto p-6">
+      <PageBody width="narrow">
         <NewIdeaForm />
-      </div>
+      </PageBody>
     </DashboardShell>
   )
 }

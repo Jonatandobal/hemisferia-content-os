@@ -10,6 +10,7 @@ import imageCompression from "browser-image-compression"
 interface UploadImageButtonProps {
   draftId: string
   disabled?: boolean
+  label?: string
 }
 
 // Tope de aceptación pre-compresión (lo que el usuario puede arrastrar).
@@ -19,7 +20,11 @@ const MAX_INPUT_SIZE = 25 * 1024 * 1024 // 25MB de entrada
 // Tope del servidor (Vercel Functions Hobby = 4.5MB request body)
 const MAX_OUTPUT_SIZE_MB = 3.5
 
-export function UploadImageButton({ draftId, disabled }: UploadImageButtonProps) {
+export function UploadImageButton({
+  draftId,
+  disabled,
+  label = "Subir foto",
+}: UploadImageButtonProps) {
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
@@ -101,17 +106,17 @@ export function UploadImageButton({ draftId, disabled }: UploadImageButtonProps)
       >
         {uploading ? (
           <>
-            <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+            <Loader2 className="animate-spin" />
             {phase === "compressing"
-              ? "Comprimiendo..."
+              ? "Comprimiendo…"
               : phase === "uploading"
-                ? "Subiendo..."
-                : "..."}
+                ? "Subiendo…"
+                : "…"}
           </>
         ) : (
           <>
-            <Upload className="w-3.5 h-3.5 mr-1.5" />
-            Subir
+            <Upload />
+            {label}
           </>
         )}
       </Button>

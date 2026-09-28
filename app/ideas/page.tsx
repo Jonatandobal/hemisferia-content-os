@@ -1,19 +1,28 @@
-import { DashboardShell } from "@/components/layout/dashboard-shell"
+import { Lightbulb } from "lucide-react"
+import { DashboardShell, PageBody } from "@/components/layout/dashboard-shell"
 import { Header } from "@/components/layout/header"
 import { IdeaCard } from "@/components/ideas/idea-card"
-import { Lightbulb } from "lucide-react"
+import { QuickCapture } from "@/components/ideas/quick-capture"
+import { LinkTabs } from "@/components/common/link-tabs"
+import { EmptyState } from "@/components/common/empty-state"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { Idea } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
 
-async function getIdeas(): Promise<Idea[]> {
+const TABS = [
+  { value: "pendientes", label: "Sin drafts", status: "pending" },
+  { value: "con-drafts", label: "Con drafts", status: "generated" },
+  { value: "todas", label: "Todas", status: null },
+] as const
+
+async function getIdeas() {
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from("ideas")
     .select("*")
     .order("created_at", { ascending: false })
-    .limit(100)
+    .limit(200)
 
   if (error) {
     console.error("Error loading ideas:", error)
@@ -22,47 +31,52 @@ async function getIdeas(): Promise<Idea[]> {
   return (data as Idea[]) ?? []
 }
 
-export default async function IdeasPage() {
+export default async function IdeasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>
+}) {
+  const { tab: tabParam } = await searchParams
   const ideas = await getIdeas()
+  const tab = TABS.find((t) => t.value === tabParam) ?? TABS[0]
+  const visible = tab.status ? ideas.filter((i) => i.status === tab.status) : ideas
 
   return (
     <DashboardShell>
       <Header
         title="Ideas"
-        description={`${ideas.length} ${ideas.length === 1 ? "idea" : "ideas"} capturadas`}
+        description="Todo empieza acá: capturá rápido, generá los drafts cuando quieras."
+        showNewIdea
       />
-      <div className="flex-1 overflow-y-auto p-6">
-        {ideas.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <div className="space-y-3 max-w-3xl">
-            {ideas.map((idea) => (
-              <IdeaCard key={idea.id} idea={idea} />
-            ))}
-          </div>
-        )}
-      </div>
-    </DashboardShell>
-  )
-}
+      <PageBody width="narrow">
+        <div className="space-y-6">
+          <QuickCapture compact />
 
-function EmptyState() {
-  return (
-    <div className="flex flex-col items-center justify-center text-center py-16 max-w-md mx-auto">
-      <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
-        <Lightbulb className="w-5 h-5 text-muted-foreground" />
-      </div>
-      <h3 className="font-semibold mb-1">Todavía no hay ideas</h3>
-      <p className="text-sm text-muted-foreground mb-4">
-        Capturá tu primera idea. Puede ser una frase suelta, un caso de
-        cliente, una opinión — lo que sea. Después la IA arma los posts.
-      </p>
-      <a
-        href="/ideas/new"
-        className="text-sm underline underline-offset-4 hover:no-underline"
-      >
-        Crear primera idea →
-      </a>
-    </div>
+          <LinkTabs
+            tabs={TABS.map((t) => ({
+              value: t.value,
+              label: t.label,
+              count: t.status ? ideas.filter((i) => i.status === t.status).length : ideas.length,
+            }))}
+            active={tab.value}
+            hrefFor={(v) => `/ideas?tab=${v}`}
+          />
+
+          {visible.length === 0 ? (
+            <EmptyState icon={Lightbulb} title={tab.value === "pendientes" ? "No hay ideas esperando" : "Nada por acá"}>
+              {tab.value === "pendientes"
+                ? "Capturá una arriba: una frase suelta alcanza. Cuanto más concreta (qué pasó, con quién, qué número), mejores los drafts."
+                : "Cuando generes drafts de tus ideas, van a aparecer acá."}
+            </EmptyState>
+          ) : (
+            <div className="space-y-3">
+              {visible.map((idea) => (
+                <IdeaCard key={idea.id} idea={idea} />
+              ))}
+            </div>
+          )}
+        </div>
+      </PageBody>
+    </DashboardShell>
   )
 }

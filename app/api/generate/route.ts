@@ -70,6 +70,14 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Evita duplicar drafts por doble click o dos pestañas abiertas.
+    if (idea.status === "generated") {
+      return NextResponse.json(
+        { error: "Esta idea ya tiene drafts generados" },
+        { status: 409 },
+      )
+    }
+
     const recent = (recentRes.data ?? []).map((d) => hookAndClosing(d.content))
 
     // 2) Construir prompt con la idea + pilar (si lo tiene)

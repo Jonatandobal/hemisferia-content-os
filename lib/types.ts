@@ -79,9 +79,38 @@ export function draftTemplate(
   return draft.template ?? LEGACY_VARIANT_TEMPLATES[draft.variant - 1] ?? null
 }
 
-export const PILLAR_COLORS: Record<Pillar, string> = {
-  caso: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-  contrarian: "bg-orange-500/10 text-orange-500 border-orange-500/20",
-  educativo: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-  founder: "bg-purple-500/10 text-purple-500 border-purple-500/20",
+// Color de identidad de cada pilar (tokens --pillar-* en globals.css).
+// Siempre se muestra junto a la etiqueta de texto, nunca solo.
+export const PILLAR_DOT: Record<Pillar, string> = {
+  caso: "bg-pillar-caso",
+  contrarian: "bg-pillar-contrarian",
+  educativo: "bg-pillar-educativo",
+  founder: "bg-pillar-founder",
+}
+
+export const PILLAR_COLOR_VAR: Record<Pillar, string> = {
+  caso: "var(--pillar-caso)",
+  contrarian: "var(--pillar-contrarian)",
+  educativo: "var(--pillar-educativo)",
+  founder: "var(--pillar-founder)",
+}
+
+export const PILLAR_DESCRIPTIONS: Record<Pillar, string> = {
+  caso: "Algo que pasó con un cliente",
+  contrarian: "Una opinión que va contra la corriente",
+  educativo: "Explicar un concepto en criollo",
+  founder: "Detrás de escena de Hemisferia",
+}
+
+export const IDEA_STATUS_LABELS: Record<IdeaStatus, string> = {
+  pending: "Sin drafts",
+  generated: "Con drafts",
+  archived: "Archivada",
+}
+
+export const DRAFT_STATUS_LABELS: Record<DraftStatus, string> = {
+  draft: "Por revisar",
+  approved: "Aprobado",
+  rejected: "Descartado",
+  published: "Publicado",
 }

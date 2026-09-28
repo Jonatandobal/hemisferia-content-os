@@ -41,9 +41,9 @@ export function LinkedInPreview({ draft }: LinkedInPreviewProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline" title="Preview tipo LinkedIn">
-          <Eye className="w-3.5 h-3.5 mr-1.5" />
-          Preview
+        <Button size="sm" variant="ghost" title="Así se va a ver en LinkedIn">
+          <Eye />
+          Vista previa
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-xl p-0 overflow-hidden">

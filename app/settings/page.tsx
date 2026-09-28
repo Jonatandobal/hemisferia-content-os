@@ -1,4 +1,4 @@
-import { DashboardShell } from "@/components/layout/dashboard-shell"
+import { DashboardShell, PageBody } from "@/components/layout/dashboard-shell"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -40,11 +40,10 @@ export default async function SettingsPage() {
       <Header
         title="Configuración"
         description="Integraciones del sistema"
-        showNewIdea={false}
       />
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-2xl space-y-4">
-          <Card>
+      <PageBody width="narrow">
+        <div className="space-y-4">
+          <Card className="rounded-2xl ring-border">
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-base">
                 Publora — publicación automática en LinkedIn
@@ -112,7 +111,7 @@ export default async function SettingsPage() {
             </CardContent>
           </Card>
         </div>
-      </div>
+      </PageBody>
     </DashboardShell>
   )
 }

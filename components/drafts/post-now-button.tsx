@@ -94,8 +94,8 @@ export function PostNowButton({ draft }: PostNowButtonProps) {
       }}
     >
       <Button size="sm" onClick={() => setOpen(true)}>
-        <Send className="w-3.5 h-3.5 mr-1.5" />
-        Postear
+        <Send />
+        Postear ahora
       </Button>
 
       <DialogContent className="max-w-md">

@@ -1,5 +1,5 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Bricolage_Grotesque, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -13,10 +13,20 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Títulos: grotesca con carácter para que la app no parezca una plantilla.
+const bricolage = Bricolage_Grotesque({
+  variable: "--font-bricolage",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
   title: "Hemisferia Content OS",
   description:
     "Sistema de gestión de contenido para LinkedIn — Hemisferia",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#16183a",
 };
 
 export default function RootLayout({
@@ -27,7 +37,7 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${bricolage.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         {children}
