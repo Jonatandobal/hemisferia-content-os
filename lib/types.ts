@@ -23,6 +23,7 @@ export interface Draft {
   status: DraftStatus
   scheduled_for: string | null
   created_at: string
+  template?: Pillar | null
   image_url?: string | null
   image_prompt?: string | null
   image_generated_at?: string | null
@@ -56,6 +57,23 @@ export const PILLAR_LABELS: Record<Pillar, string> = {
   contrarian: "Contrarian",
   educativo: "Educativo",
   founder: "Founder",
+}
+
+export const PILLAR_SHORT_LABELS: Record<Pillar, string> = {
+  caso: "Caso",
+  contrarian: "Contra",
+  educativo: "Educ",
+  founder: "Founder",
+}
+
+// Los drafts previos a la columna `template` no la tienen: se asumía
+// por posición (1 = caso, 2 = contrarian, 3 = educativo).
+const LEGACY_VARIANT_TEMPLATES: Pillar[] = ["caso", "contrarian", "educativo"]
+
+export function draftTemplate(
+  draft: Pick<Draft, "template" | "variant">,
+): Pillar | null {
+  return draft.template ?? LEGACY_VARIANT_TEMPLATES[draft.variant - 1] ?? null
 }
 
 export const PILLAR_COLORS: Record<Pillar, string> = {
