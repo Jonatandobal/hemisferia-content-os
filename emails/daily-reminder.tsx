@@ -15,8 +15,7 @@ import {
   Tailwind,
   Text,
 } from "@react-email/components"
-import { format } from "date-fns"
-import { es } from "date-fns/locale"
+import { formatLongDate, formatTime } from "@/lib/timezone"
 
 interface DraftPreview {
   id: string
@@ -37,7 +36,7 @@ export default function DailyReminderEmail({
   date,
   drafts,
 }: DailyReminderEmailProps) {
-  const dateLabel = format(date, "EEEE d 'de' MMMM", { locale: es })
+  const dateLabel = formatLongDate(date)
   const variantLabels = ["Caso real", "Contrarian", "Educativo", "Founder"]
   const previewText = `Tenés ${drafts.length} ${drafts.length === 1 ? "post" : "posts"} para publicar hoy`
 
@@ -67,7 +66,7 @@ export default function DailyReminderEmail({
 
               {drafts.map((draft, i) => {
                 const hour = draft.scheduled_for
-                  ? format(new Date(draft.scheduled_for), "HH:mm")
+                  ? formatTime(new Date(draft.scheduled_for))
                   : "—"
                 const variantLabel =
                   variantLabels[draft.variant - 1] ?? `V${draft.variant}`

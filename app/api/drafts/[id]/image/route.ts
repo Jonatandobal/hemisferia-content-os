@@ -7,6 +7,8 @@ import { IMAGE_BRIEF_SYSTEM_PROMPT } from "@/lib/image-prompts"
 
 export const maxDuration = 60
 
+const BUCKET = "draft-images"
+
 // Cliente OpenAI nativo para DALL-E (el AI SDK no expone images.generate aún).
 const openaiNative = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -16,8 +18,8 @@ const openaiNative = new OpenAI({
 // Flujo:
 //   1. Lee el draft
 //   2. GPT-4o convierte el post en un prompt visual
-//   3. DALL-E 3 genera la imagen
-//   4. Guarda la URL en el draft
+//   3. gpt-image-1 / DALL-E genera la imagen
+//   4. La sube a Supabase Storage y guarda la URL pública en el draft
 export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -56,8 +58,8 @@ export async function POST(
       )
     }
 
-    // 3) DALL-E 3 genera la imagen (1792x1024 = aspect ratio cercano a 16:9 que
-    //    es lo que LinkedIn renderiza bien en feed).
+    // 3) Generar la imagen en formato apaisado (lo que LinkedIn renderiza bien
+    //    en feed).
     // Intentamos en orden: gpt-image-1 (nuevo) → dall-e-3 (legacy) → dall-e-2.
     // Distintas cuentas OpenAI tienen acceso a modelos distintos.
     const models = ["gpt-image-1", "dall-e-3", "dall-e-2"] as const
@@ -110,15 +112,18 @@ export async function POST(
       )
     }
 
-    // gpt-image-1 devuelve b64_json por default, dall-e-3 devuelve url
+    // gpt-image-1 devuelve b64_json, dall-e-3/2 devuelven una URL que vence
+    // en ~60 min. En ambos casos bajamos los bytes y los subimos a Storage.
     const first = imageRes.data?.[0]
-    let imageUrl: string | null = first?.url ?? null
-    if (!imageUrl && first?.b64_json) {
-      // Convertir base64 a data URL para guardar
-      imageUrl = `data:image/png;base64,${first.b64_json}`
+    let bytes: Uint8Array | null = null
+    if (first?.b64_json) {
+      bytes = Buffer.from(first.b64_json, "base64")
+    } else if (first?.url) {
+      const download = await fetch(first.url)
+      if (download.ok) bytes = new Uint8Array(await download.arrayBuffer())
     }
 
-    if (!imageUrl) {
+    if (!bytes) {
       return NextResponse.json(
         {
           error: "El modelo no devolvió imagen",
@@ -129,10 +134,24 @@ export async function POST(
       )
     }
 
-    // 4) Guardar en el draft
-    // ⚠️ NOTA: La URL de DALL-E vence en ~60 min. Para uso real deberíamos
-    // descargar la imagen y subirla a Supabase Storage. Por ahora la guardamos
-    // así para validar el flujo. Más adelante migramos a Storage.
+    // 4) Subir a Supabase Storage (mismo bucket que las fotos subidas a mano)
+    const path = `${id}/ai-${Date.now()}.png`
+    const { error: uploadErr } = await supabase.storage
+      .from(BUCKET)
+      .upload(path, bytes, { contentType: "image/png", upsert: false })
+
+    if (uploadErr) {
+      console.error("Error uploading generated image:", uploadErr)
+      return NextResponse.json(
+        { error: `No se pudo guardar la imagen: ${uploadErr.message}` },
+        { status: 500 },
+      )
+    }
+
+    const imageUrl = supabase.storage.from(BUCKET).getPublicUrl(path)
+      .data.publicUrl
+
+    // 5) Guardar la URL pública en el draft
     const { error: updateErr } = await supabase
       .from("drafts")
       .update({
